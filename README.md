@@ -26,14 +26,13 @@ This is for convenience, so that you can quickly and easily add `| Watch-Command
 ```
 Get-Service | wc
 ```
-
 By default the cmdlet will run the specified ScriptBlock every 1 second and then return its output in full once it has changed from the first iteration. You can change the duration between checks via the `-Seconds` parameter.
 
 You can have the script run continuously (until interrupted via CTRL+C) by adding the `-Continuous` parameter.
 
 You can have the script return only objects in a collection that have changed or been added by using the `-Difference` parameter.
 
-If you use `-Verbose` the console will output a timestamp to the console each time a change has occurred.
+If you use `-Verbose` you will see a timestamp in the console prior to a change being output (particularly useful when using `-Continuous` and `-Difference`).
 
 For example:
 ```
