@@ -1,15 +1,17 @@
 # PowerShell-Watch
 
+[![Build status](https://ci.appveyor.com/api/projects/status/88kfxhpbhjvrc0ms?svg=true)](https://ci.appveyor.com/project/markwragg/powershell-watch)
+
 This PowerShell module contains a `Watch-Command` cmdlet that can be used to repeatedly run a PowerShell command or scriptblock to return output when it has changed.
 
-# Installation
+## Installation
 
 The module is published in the PSGallery, so if you have PowerShell 5 can be installed by running:
 ```
 Install-Module Watch -Scope CurrentUser
 ```
 
-# Usage
+## Usage
 
 You can use the `Watch-Command` cmdlet by providing it with a ScriptBlock. For example:
 
@@ -49,7 +51,7 @@ Get-Process | Watch-Command -Property Name -Diff -Cont
 ```
 This command will continually list output each time the name property of the output of `Get-Process` has changed (e.g a new process has started). 
 
-# Cmdlets
+## Cmdlets
 
 A full list of cmdlets in this module is provided below for reference. Use `Get-Help <cmdlet name>` with these to learn more about their usage.
 
