@@ -29,7 +29,7 @@
         .PARAMETER Property
             Manually specify one or more property names to be used for comparison. If not specified,
             the default display property set is used. If there is not a default display property set,
-            all properties are used.
+            all properties are used. You can also use '*' to force all properties.
 
         .EXAMPLE
             Watch-Command -ScriptBlock { Get-Process }
@@ -83,16 +83,19 @@
      
     $FirstResult = Invoke-Command $ScriptBlock
     
-    if ($AsString) { $FirstResult = $FirstResult | Out-String -Stream }
+    if ($AsString) 
+    { 
+        $FirstResult = $FirstResult | Out-String -Stream 
+    }
 
     if (-not $Property) 
     {
         $Property = ($FirstResult | Select-Object -First 1).PSStandardMembers.DefaultDisplayPropertySet.ReferencedPropertyNames
-        
-        if (-not $Property)
-        {
-            $Property = ($FirstResult | Select-Object -First 1).PSObject.Properties.Name
-        }
+    }
+    
+    if (-not $Property -or $Property -eq '*')
+    {
+        $Property = ($FirstResult | Select-Object -First 1).PSObject.Properties.Name
     }
 
     Write-Verbose "Properties: $($Property -Join ',')"
