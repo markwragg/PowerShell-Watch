@@ -4,6 +4,9 @@
 
 This PowerShell module contains a `Watch-Command` cmdlet that can be used to repeatedly run a PowerShell command or scriptblock to return output when it has changed.
 
+![Watch-Command Get-Service Example](/Media/watch-command-get-service-continuous.png)
+
+
 ## Installation
 
 The module is published in the PSGallery, so if you have PowerShell 5 can be installed by running:
@@ -26,6 +29,7 @@ This is for convenience, so that you can quickly and easily add `| Watch-Command
 ```
 Get-Service | wc
 ```
+
 By default the cmdlet will run the specified ScriptBlock every 1 second and then return its output in full once it has changed from the first iteration. You can change the duration between checks via the `-Seconds` parameter.
 
 You can have the script run continuously (until interrupted via CTRL+C) by adding the `-Continuous` parameter.
@@ -46,9 +50,20 @@ If you want to specify specific properties to monitor for change, you can do so 
 
 For example:
 ```
-Get-Process | Watch-Command -Property Name -Diff -Cont
+Get-Process | Watch-Command -Diff -Cont -Property id
 ```
-This command will continually list output each time the name property of the output of `Get-Process` has changed (e.g a new process has started). 
+
+![Watch-Command Get-Process Example](/Media/watch-command-get-process-id-continuous.png)
+
+This command will continually list output each time the id property of the output of `Get-Process` has changed (e.g a new process has started). 
+
+By default `Watch-Command` will use the Default Display Set of properties (if a set exists) as the properties to monitor. If a Default Display Set does not exist then it will use all properties. If you want to force the use of all properties you can specify `-Property *`.
+
+You can also use Watch-Command to monitor non-PowerShell command output (which will generally be treated as strings). Here's an example of monitoring the output of ipconfig /all for a change to the DNS server addresses:
+
+![Watch-Command ipconfig Example](/Media/watch-command-ipconfig.png)
+
+If you want to force `Watch-Command` to treat the result of the command as an array of strings regardless of the object type returned, you can do so via the `-AsString` parameter.
 
 ## Cmdlets
 
