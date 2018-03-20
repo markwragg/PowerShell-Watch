@@ -84,17 +84,19 @@
     if ($AsString) { 
         $FirstResult = $FirstResult | Out-String -Stream 
     }
+    elseif (($FirstResult | Select-Object -First 1) -isnot [string]){
+        if (-not $Property) {
+            $Property = ($FirstResult | Select-Object -First 1).PSStandardMembers.DefaultDisplayPropertySet.ReferencedPropertyNames
+        }
+        
+        if (-not $Property -or $Property -eq '*') {
+            $Property = ($FirstResult | Select-Object -First 1).PSObject.Properties.Name
+        } 
 
-    if (-not $Property) {
-        $Property = ($FirstResult | Select-Object -First 1).PSStandardMembers.DefaultDisplayPropertySet.ReferencedPropertyNames
+        Write-Verbose "Watched properties: $($Property -Join ',')"   
     }
+
     
-    if (-not $Property -or $Property -eq '*') {
-        $Property = ($FirstResult | Select-Object -First 1).PSObject.Properties.Name
-    }
-
-    Write-Verbose "Watched properties: $($Property -Join ',')"
-
     do { 
         do {
             if ($Result) { 
@@ -103,12 +105,16 @@
 
             $Result = Invoke-Command $ScriptBlock
 
+            if ($AsString) { 
+                $Result = $Result | Out-String -Stream 
+            }
+
             $CompareParams = @{
                 ReferenceObject  = @($FirstResult | Select-Object)
                 DifferenceObject = @($Result | Select-Object)
             }
 
-            if (-not $AsString) { 
+            if ($Property) { 
                 $CompareParams.Add('Property', $Property)
             }
             
