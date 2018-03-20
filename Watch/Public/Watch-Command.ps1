@@ -48,7 +48,8 @@
     #>      
     [cmdletbinding()]
     Param(
-        [parameter(ValueFromPipeline,Mandatory)]
+        [parameter(ValueFromPipeline, Mandatory)]
+        [object]
         $ScriptBlock,
 
         [int]
@@ -67,45 +68,36 @@
         $Property
     )
  
-    if ($ScriptBlock -isnot [scriptblock])
-    {
-        if ($MyInvocation.PipelinePosition -gt 1)
-        {        
+    if ($ScriptBlock -isnot [scriptblock]) {
+        if ($MyInvocation.PipelinePosition -gt 1) {        
             $ScriptBlock = [Scriptblock]::Create( ($MyInvocation.Line -Split "\|\s*$($MyInvocation.InvocationName)")[0] )
         }
-        else
-        {
+        else {
             Throw 'The -ScriptBlock parameter must be provided an object of type ScriptBlock unless invoked via the Pipeline.'
         }
     }
        
-    Write-Verbose "Started watching $($ScriptBlock | Out-String)"
+    Write-Verbose "Started executing $($ScriptBlock | Out-String)"
      
     $FirstResult = Invoke-Command $ScriptBlock
     
-    if ($AsString) 
-    { 
+    if ($AsString) { 
         $FirstResult = $FirstResult | Out-String -Stream 
     }
 
-    if (-not $Property) 
-    {
+    if (-not $Property) {
         $Property = ($FirstResult | Select-Object -First 1).PSStandardMembers.DefaultDisplayPropertySet.ReferencedPropertyNames
     }
     
-    if (-not $Property -or $Property -eq '*')
-    {
+    if (-not $Property -or $Property -eq '*') {
         $Property = ($FirstResult | Select-Object -First 1).PSObject.Properties.Name
     }
 
-    Write-Verbose "Properties: $($Property -Join ',')"
+    Write-Verbose "Watched properties: $($Property -Join ',')"
 
-    do 
-    { 
-        do
-        {
-            if ($Result)
-            { 
+    do { 
+        do {
+            if ($Result) { 
                 Start-Sleep $Seconds
             }
 
@@ -116,9 +108,8 @@
                 DifferenceObject = @($Result | Select-Object)
             }
 
-            if (-not $AsString)
-            { 
-                $CompareParams.Add('Property',$Property)
+            if (-not $AsString) { 
+                $CompareParams.Add('Property', $Property)
             }
             
             $Diff = Compare-Object @CompareParams -PassThru
@@ -127,17 +118,14 @@
         
         Write-Verbose "Change occurred at $(Get-Date)"
         
-        if ($Difference) 
-        { 
+        if ($Difference) { 
             $Diff | Where-Object {$_.SideIndicator -eq '=>'}
         }
-        else 
-        {
+        else {
             $Result
         }
         
         $FirstResult = $Result
-
     }
     until (-not $Continuous)
 }
