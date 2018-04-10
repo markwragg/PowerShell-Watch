@@ -22,13 +22,12 @@ test_script:
   - ps: . .\build.ps1
 
 on_success:
+  - git config --global credential.helper store
   - ps: Add-Content "$HOME\.git-credentials" "https://$($env:GitToken):x-oauth-basic@github.com`n"
-  - cmd: |
-      git config --global credential.helper store
-      git config --global user.email "build@appveyor.com"
-      git config --global user.name "Appveyor"
-      git checkout %APPVEYOR_REPO_BRANCH%
-      git add *.psd1
-      git add readme.md
-      git commit -m "[skip ci] AppVeyor Build %APPVEYOR_BUILD_VERSION%"
-      git push
+  - git config --global user.email "build@appveyor.com"
+  - git config --global user.name "Appveyor"
+  - git checkout %APPVEYOR_REPO_BRANCH%
+  - git add *.psd1
+  - git add readme.md
+  - git commit -m "[skip ci] AppVeyor Build %APPVEYOR_BUILD_VERSION%"
+  - git push

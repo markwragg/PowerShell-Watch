@@ -69,7 +69,7 @@
     )
  
     if ($ScriptBlock -isnot [scriptblock]) {
-        if ($MyInvocation.PipelinePosition -gt 1) {        
+        if ($MyInvocation.PipelinePosition -gt 1) {
             $ScriptBlock = [Scriptblock]::Create( ($MyInvocation.Line -Split "\|\s*$($MyInvocation.InvocationName)")[0] )
         }
         else {
