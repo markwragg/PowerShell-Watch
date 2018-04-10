@@ -34,7 +34,8 @@ Task Test -Depends Init  {
     "`n`tSTATUS: Testing with PowerShell $PSVersion"
 
     # Gather test results. Store them in a variable and file
-    $TestResults = Invoke-Pester -Path $ProjectRoot\Tests -PassThru -OutputFormat NUnitXml -OutputFile "$ProjectRoot\$TestFile" -ExcludeTag Integration
+    $CodeFiles = (Get-ChildItem $ENV:BHModulePath -Recurse -Include "*.psm1","*.ps1").FullName
+    $Script:TestResults = Invoke-Pester -Path $ProjectRoot\Tests -CodeCoverage $CodeFiles -PassThru -OutputFormat NUnitXml -OutputFile "$ProjectRoot\$TestFile" -ExcludeTag Integration
 
     # In Appveyor?  Upload our tests! #Abstract this into a function?
     If($ENV:BHBuildSystem -eq 'AppVeyor')
@@ -48,16 +49,49 @@ Task Test -Depends Init  {
 
     # Failed tests?
     # Need to tell psake or it will proceed to the deployment. Danger!
-    if($TestResults.FailedCount -gt 0)
+    if($Script:TestResults.FailedCount -gt 0)
     {
-        Write-Error "Failed '$($TestResults.FailedCount)' tests, build failed"
+        Write-Error "Failed '$($Script:TestResults.FailedCount)' tests, build failed"
     }
     "`n"
 }
 
 Task Build -Depends Test {
     '----------------------------------------------------------------------'
-    #Set-ModuleFunctions
+    #Update readme.md with Code Coverage result
+    function Update-CodeCoveragePercent {
+        [cmdletbinding(supportsshouldprocess)]
+        param(
+            [int]
+            $CodeCoverage = 0,
+            
+            [string]
+            $TextFilePath = "$Env:BHProjectPath\Readme.md"
+        )
+    
+        $BadgeColor = switch ($CodeCoverage) 
+        {
+            100             { 'brightgreen' }
+            {$_ -in 95..99} { 'green' }
+            {$_ -in 85..94} { 'yellowgreengreen' }
+            {$_ -in 75..84} { 'yellow' }
+            {$_ -in 65..74} { 'orange' }
+            default         { 'red' }
+        }
+    
+        if ($PSCmdlet.ShouldProcess($TextFilePath))
+        {
+            $ReadmeContent = (Get-Content $TextFilePath)
+            $ReadmeContent = $ReadmeContent -replace "!\[Test Coverage\].+\)", "![Test Coverage](https://img.shields.io/badge/coverage-$CodeCoverage%25-$BadgeColor.svg)" 
+            $ReadmeContent | Set-Content -Path $TextFilePath
+        }
+    }
+    
+    $CoveragePercent = 100 - (($Script:TestResults.CodeCoverage.NumberOfCommandsMissed / $Script:TestResults.CodeCoverage.NumberOfCommandsAnalyzed) * 100)
+
+    "`n`tSTATUS: Running Update-CodeCoveragePercent with percentage $CoveragePercent"
+    Update-CodeCoveragePercent -CodeCoverage $CoveragePercent
+    "`n"
 }
 
 Task Deploy -Depends Build {
