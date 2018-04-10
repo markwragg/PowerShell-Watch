@@ -12,7 +12,7 @@
 RootModule = 'Watch.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.17'
+ModuleVersion = '1.0.10'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
