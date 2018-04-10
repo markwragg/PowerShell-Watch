@@ -69,8 +69,7 @@ Task Build -Depends Test {
             $TextFilePath = "$Env:BHProjectPath\Readme.md"
         )
     
-        $BadgeColor = switch ($CodeCoverage) 
-        {
+        $BadgeColor = switch ($CodeCoverage) {
             100             { 'brightgreen' }
             {$_ -in 95..99} { 'green' }
             {$_ -in 85..94} { 'yellowgreengreen' }
@@ -79,17 +78,16 @@ Task Build -Depends Test {
             default         { 'red' }
         }
     
-        if ($PSCmdlet.ShouldProcess($TextFilePath))
-        {
+        if ($PSCmdlet.ShouldProcess($TextFilePath)) {
             $ReadmeContent = (Get-Content $TextFilePath)
-            $ReadmeContent = $ReadmeContent -replace "!\[Test Coverage\].+\)", "![Test Coverage](https://img.shields.io/badge/coverage-$CodeCoverage%25-$BadgeColor.svg)" 
+            $ReadmeContent = $ReadmeContent -replace "!\[Test Coverage\].+\)", "![Test Coverage](https://img.shields.io/badge/coverage-$CodeCoverage%25-$BadgeColor.svg?)" 
             $ReadmeContent | Set-Content -Path $TextFilePath
         }
     }
     
-    $CoveragePercent = 100 - (($Script:TestResults.CodeCoverage.NumberOfCommandsMissed / $Script:TestResults.CodeCoverage.NumberOfCommandsAnalyzed) * 100)
+    $CoveragePercent = [math]::floor(100 - (($Script:TestResults.CodeCoverage.NumberOfCommandsMissed / $Script:TestResults.CodeCoverage.NumberOfCommandsAnalyzed) * 100))
 
-    "`n`tSTATUS: Running Update-CodeCoveragePercent with percentage $CoveragePercent"
+    "`n`tSTATUS: Running Update-CodeCoveragePercent to update Readme.md with $CoveragePercent% code coverage badge"
     Update-CodeCoveragePercent -CodeCoverage $CoveragePercent
     "`n"
 }
@@ -99,11 +97,12 @@ Task Deploy -Depends Build {
     # Update Manifest version number
     $ManifestPath = $Env:BHPSModuleManifest
     
-    If (-Not $env:APPVEYOR_BUILD_VERSION) {
+    if (-Not $env:APPVEYOR_BUILD_VERSION) {
         $Manifest = Test-ModuleManifest -Path $manifestPath
         [System.Version]$Version = $Manifest.Version
         [String]$NewVersion = New-Object -TypeName System.Version -ArgumentList ($Version.Major, $Version.Minor, $Version.Build, ($Version.Revision+1))
-    } Else {
+    } 
+    else {
         $NewVersion = $env:APPVEYOR_BUILD_VERSION
     }
     "New Version: $NewVersion"
@@ -111,11 +110,7 @@ Task Deploy -Depends Build {
     $FunctionList = @((Get-ChildItem -File -Recurse -Path .\$Env:BHProjectName\Public).BaseName)
 
     Update-ModuleManifest -Path $ManifestPath -ModuleVersion $NewVersion -FunctionsToExport $functionList
-    (Get-Content -Path $ManifestPath) -replace "PSGet_$Env:BHProjectName", "$Env:BHProjectName" | Set-Content -Path $ManifestPath
-    (Get-Content -Path $ManifestPath) -replace 'NewManifest', "$Env:BHProjectName" | Set-Content -Path $ManifestPath
-    (Get-Content -Path $ManifestPath) -replace 'FunctionsToExport = ', 'FunctionsToExport = @(' | Set-Content -Path $ManifestPath -Force
-    (Get-Content -Path $ManifestPath) -replace "$($FunctionList[-1])'", "$($FunctionList[-1])')" | Set-Content -Path $ManifestPath -Force
-
+    
     $Params = @{
         Path = $ProjectRoot
         Force = $true
