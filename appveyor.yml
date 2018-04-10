@@ -4,6 +4,8 @@
 environment:
   NuGetApiKey:
     secure: +lqWVtVRayO6KNlJeu9lrnzmtGXreNPIr1Fn3dhXxYTJAHHAOPCPVWvFVkRX7wlr
+  GitToken:
+    secure: zYCOwcOlgTzvbD0CjJRDNQ==
 
 # Allow WMF5 (i.e. PowerShellGallery functionality)
 os: WMF 5
@@ -18,3 +20,11 @@ build: false
 #Kick off the CI/CD pipeline
 test_script:
   - ps: . .\build.ps1
+
+on_success:
+  - git config --global credential.helper store
+  - ps: Add-Content "$HOME\.git-credentials" "https://$($env:GitToken):x-oauth-basic@github.com`n"
+  - git config --global user.email "Your email"
+  - git config --global user.name "Your Name"
+  - git commit -m "Build $($env:APPVEYOR_BUILD_VERSION)"
+  - git push
