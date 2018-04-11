@@ -70,12 +70,10 @@ Task Build -Depends Test {
         )
     
         $BadgeColor = switch ($CodeCoverage) {
-            100             { 'brightgreen' }
-            {$_ -in 95..99} { 'green' }
-            {$_ -in 85..94} { 'yellowgreengreen' }
-            {$_ -in 75..84} { 'yellow' }
-            {$_ -in 65..74} { 'orange' }
-            default         { 'red' }
+            {$_ -in 90..100} { 'brightgreen' }
+            {$_ -in 75..89}  { 'yellow' }
+            {$_ -in 60..74}  { 'orange' }
+            default          { 'red' }
         }
     
         if ($PSCmdlet.ShouldProcess($TextFilePath)) {
