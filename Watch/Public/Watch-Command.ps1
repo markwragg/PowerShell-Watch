@@ -22,10 +22,10 @@
 
         .PARAMETER Continuous
             Switch: Run continuously (even after a change has occurred) until exited with CTRL+C.
-        
+
         .PARAMETER AsString
             Switch: Converts the result of the scriptblock into an array of strings for comparison.
-        
+
         .PARAMETER Property
             Manually specify one or more property names to be used for comparison. If not specified,
             the default display property set is used. If there is not a default display property set,
@@ -45,7 +45,7 @@
 
         .EXAMPLE
             Get-Process | Watch-Command -Difference -Property processname,id -Continuous
-    #>      
+    #>
     [cmdletbinding()]
     Param(
         [parameter(ValueFromPipeline, Mandatory)]
@@ -67,7 +67,7 @@
         [string[]]
         $Property
     )
- 
+
     if ($ScriptBlock -isnot [scriptblock]) {
         if ($MyInvocation.PipelinePosition -gt 1) {
             $ScriptBlock = [Scriptblock]::Create( ($MyInvocation.Line -Split "\|\s*$($MyInvocation.InvocationName)")[0] )
@@ -76,37 +76,37 @@
             Throw 'The -ScriptBlock parameter must be provided an object of type ScriptBlock unless invoked via the Pipeline.'
         }
     }
-       
+
     Write-Verbose "Started executing $($ScriptBlock | Out-String)"
-     
+
     $FirstResult = Invoke-Command $ScriptBlock
-    
-    if ($AsString) { 
-        $FirstResult = $FirstResult | Out-String -Stream 
+
+    if ($AsString) {
+        $FirstResult = $FirstResult | Out-String -Stream
     }
     elseif (($FirstResult | Select-Object -First 1) -isnot [string]){
         if (-not $Property) {
             $Property = ($FirstResult | Select-Object -First 1).PSStandardMembers.DefaultDisplayPropertySet.ReferencedPropertyNames
         }
-        
+
         if (-not $Property -or $Property -eq '*') {
             $Property = ($FirstResult | Select-Object -First 1).PSObject.Properties.Name
-        } 
+        }
 
-        Write-Verbose "Watched properties: $($Property -Join ',')"   
+        Write-Verbose "Watched properties: $($Property -Join ',')"
     }
 
-    
-    do { 
+
+    do {
         do {
-            if ($Result) { 
+            if ($Result) {
                 Start-Sleep $Seconds
             }
 
             $Result = Invoke-Command $ScriptBlock
 
-            if ($AsString) { 
-                $Result = $Result | Out-String -Stream 
+            if ($AsString) {
+                $Result = $Result | Out-String -Stream
             }
 
             $CompareParams = @{
@@ -114,23 +114,23 @@
                 DifferenceObject = @($Result | Select-Object)
             }
 
-            if ($Property) { 
+            if ($Property) {
                 $CompareParams.Add('Property', $Property)
             }
-            
+
             $Diff = Compare-Object @CompareParams -PassThru
-        } 
+        }
         until ($Diff)
-        
+
         Write-Verbose "Change occurred at $(Get-Date)"
-        
-        if ($Difference) { 
+
+        if ($Difference) {
             $Diff | Where-Object {$_.SideIndicator -eq '=>'}
         }
         else {
             $Result
         }
-        
+
         $FirstResult = $Result
     }
     until (-not $Continuous)
