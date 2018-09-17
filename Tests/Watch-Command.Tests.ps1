@@ -62,7 +62,6 @@ Describe "Watch-Command PS$PSVersion" {
             }
         }
 
-
         Context 'Expected exceptions' {
             It 'Should throw if a ScriptBlock is not provided unless via Pipeline' {
                 { Watch-Command -ScriptBlock Get-Date } | Should -Throw 'The -ScriptBlock parameter must be provided an object of type ScriptBlock unless invoked via the Pipeline.'

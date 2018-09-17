@@ -26,6 +26,9 @@
         .PARAMETER AsString
             Switch: Converts the result of the scriptblock into an array of strings for comparison.
 
+        .PARAMETER ClearScreen
+            Switch: Clears the screen between each result. You can also use 'cls' as an alias.
+
         .PARAMETER Property
             Manually specify one or more property names to be used for comparison. If not specified,
             the default display property set is used. If there is not a default display property set,
@@ -38,7 +41,7 @@
             Get-Service | Watch-Command -Diff -Cont
 
         .EXAMPLE
-            Watch-Command { Get-Content test.txt } -Difference -Verbose
+            Watch-Command { Get-Content test.txt } -Difference -Verbose -ClearScreen
 
         .EXAMPLE
             Get-ChildItem | Watch-Command -Difference -AsString
@@ -63,6 +66,10 @@
 
         [switch]
         $AsString,
+
+        [alias('cls')]
+        [switch]
+        $ClearScreen,
 
         [string[]]
         $Property
@@ -103,6 +110,10 @@
                 Start-Sleep $Seconds
             }
 
+            if ($ClearScreen) {
+                Clear-Host
+            }
+
             $Result = Invoke-Command $ScriptBlock
 
             if ($AsString) {
@@ -128,7 +139,7 @@
             $Diff | Where-Object {$_.SideIndicator -eq '=>'}
         }
         else {
-            $Result
+            $Result | Out-Default
         }
 
         $FirstResult = $Result
