@@ -26,7 +26,7 @@
                     
                     Write-Verbose -Message "$($ModuleName) Installed Version [$($Version.tostring())] is outdated. Installing Gallery Version [$($GalleryVersion.tostring())]"
                     
-                    Install-Module -Name $ModuleName -Force -Scope CurrentUser
+                    Install-Module -Name $ModuleName -Force -Scope CurrentUser -SkipPublisherCheck
                     Import-Module -Name $ModuleName -Force -RequiredVersion $GalleryVersion
                 }
                 else
@@ -38,7 +38,7 @@
             else
             {
                 Write-Verbose -Message "$($ModuleName) Missing, installing Module"
-                Install-Module -Name $ModuleName -Force -Scope CurrentUser
+                Install-Module -Name $ModuleName -Force -Scope CurrentUser -SkipPublisherCheck
                 Import-Module -Name $ModuleName -Force -RequiredVersion $Version
             }
         }
