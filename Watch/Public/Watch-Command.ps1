@@ -139,7 +139,7 @@
             $Diff | Where-Object {$_.SideIndicator -eq '=>'}
         }
         else {
-            $Result | Out-Default
+            $Result
         }
 
         $FirstResult = $Result
