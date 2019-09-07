@@ -59,34 +59,12 @@ Task Test -Depends Init  {
 Task Build -Depends Test {
     '----------------------------------------------------------------------'
     #Update readme.md with Code Coverage result
-    function Update-CodeCoveragePercent {
-        [cmdletbinding(supportsshouldprocess)]
-        param(
-            [int]
-            $CodeCoverage = 0,
-            
-            [string]
-            $TextFilePath = "$Env:BHProjectPath\Readme.md"
-        )
-    
-        $BadgeColor = switch ($CodeCoverage) {
-            {$_ -in 90..100} { 'brightgreen' }
-            {$_ -in 75..89}  { 'yellow' }
-            {$_ -in 60..74}  { 'orange' }
-            default          { 'red' }
-        }
-    
-        if ($PSCmdlet.ShouldProcess($TextFilePath)) {
-            $ReadmeContent = (Get-Content $TextFilePath)
-            $ReadmeContent = $ReadmeContent -replace "!\[Test Coverage\].+\)", "![Test Coverage](https://img.shields.io/badge/coverage-$CodeCoverage%25-$BadgeColor.svg?maxAge=60)" 
-            $ReadmeContent | Set-Content -Path $TextFilePath
-        }
-    }
-    
     $CoveragePercent = [math]::floor(100 - (($Script:TestResults.CodeCoverage.NumberOfCommandsMissed / $Script:TestResults.CodeCoverage.NumberOfCommandsAnalyzed) * 100))
 
-    "`n`tSTATUS: Running Update-CodeCoveragePercent to update Readme.md with $CoveragePercent% code coverage badge"
-    Update-CodeCoveragePercent -CodeCoverage $CoveragePercent
+    "`n`tSTATUS: Running Set-ShieldsIoBadge to update Readme.md with $CoveragePercent% code coverage badge"
+
+    Set-ShieldsIoBadge -Subject 'Coverage' -Status $CoveragePercent -AsPercentage
+
     "`n"
 }
 
