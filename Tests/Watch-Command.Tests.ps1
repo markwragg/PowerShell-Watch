@@ -5,6 +5,9 @@ $Root = "$PSScriptRoot\..\"
 $Module = 'Watch'
 
 Get-Module $Module | Remove-Module -Force
+Start-Sleep 5
+
+Import-Module $Root\$Module
 
 Describe "Watch-Command PS$PSVersion" {
     
