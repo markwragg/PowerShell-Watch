@@ -4,6 +4,8 @@ $PSVersion = $PSVersionTable.PSVersion.Major
 $Root = "$PSScriptRoot\..\"
 $Module = 'Watch'
 
+Get-Module $Module | Remove-Module -Force
+
 Describe "Watch-Command PS$PSVersion" {
     
     InModuleScope Watch {
