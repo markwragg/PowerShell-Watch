@@ -1,6 +1,6 @@
 # PowerShell-Watch
 
-[![Build status](https://ci.appveyor.com/api/projects/status/88kfxhpbhjvrc0ms?svg=true)](https://ci.appveyor.com/project/markwragg/powershell-watch) ![Test Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg?maxAge=60)
+[![Build Status](https://dev.azure.com/markwragg/GitHub/_apis/build/status/markwragg.PowerShell-Watch?branchName=master)](https://dev.azure.com/markwragg/GitHub/_build/latest?definitionId=8&branchName=master) ![Test Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg?maxAge=60)
 
 This PowerShell module contains a `Watch-Command` cmdlet that can be used to repeatedly run a PowerShell command or scriptblock to return output when it has changed.
 
