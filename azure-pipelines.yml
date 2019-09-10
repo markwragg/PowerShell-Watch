@@ -1,0 +1,75 @@
+variables:
+- group: powershell-gallery
+
+# Build Pipeline
+pool:
+  # What environment will the build agent run on? (Windows / Linux / macOS)
+  vmImage: "vs2017-win2016"
+
+trigger:
+  batch: true
+
+  # What branches will trigger a build?
+  branches:
+    include:
+      # Any Pull Request merging into the master branch
+      - master
+
+steps:
+  - checkout: self
+    persistCredentials: true
+    clean: true
+    
+  - powershell: |
+      .\Build\build.ps1 -ResolveDependency -TaskList 'Init'
+    displayName: "Install Dependencies"
+
+  - powershell: |
+      .\Build\build.ps1 -TaskList 'CombineFunctionsAndStage'
+    displayName: "Combine PowerShell functions into single module file"
+
+  - powershell: |
+      .\Build\build.ps1 -TaskList 'Analyze'
+    displayName: "Analyze"
+
+  - powershell: |
+      .\Build\build.ps1 -TaskList 'Test'
+    displayName: "Test"
+
+  - powershell: |
+      .\Build\build.ps1 -TaskList 'UpdateDocumentation'
+    displayName: "Update Documentation"
+
+  - powershell: |
+      .\Build\build.ps1 -TaskList 'Deploy'
+    displayName: "Deploy"
+
+  - powershell: |
+      .\Build\build.ps1 -TaskList 'Commit'
+    displayName: "Commit Changes"
+
+  - powershell: |
+      .\Build\build.ps1 -TaskList 'CreateBuildArtifact'
+    displayName: "Create Build Artifact"
+
+  - task: PublishTestResults@2
+    displayName: "Publish Pester Tests"
+    inputs:
+      testRunner: "NUnit"
+      searchFolder: "Artifacts"
+      testRunTitle: "PesterTests"
+    condition: always()
+
+  - task: PublishBuildArtifacts@1
+    displayName: "Publish Artifact: PowerShell Module Zipped for offline use"
+    inputs:
+      PathtoPublish: Artifacts
+      ArtifactName: Artifacts
+    condition: always()
+
+  - task: PublishBuildArtifacts@1
+    displayName: "Publish Artifact: PowerShell Module"
+    inputs:
+      PathtoPublish: Staging
+      ArtifactName: PSModule
+    condition: always()

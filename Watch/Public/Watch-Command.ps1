@@ -37,17 +37,30 @@
         .EXAMPLE
             Watch-Command -ScriptBlock { Get-Process }
 
+            Runs Get-Process and waits for any returns the result when the data has changed.
+
         .EXAMPLE
             Get-Service | Watch-Command -Diff -Cont
+
+            Runs Get-Service and returns any differences in the resultant data, continuously until interrupted
+            by CTRL+C.
 
         .EXAMPLE
             Watch-Command { Get-Content test.txt } -Difference -Verbose -ClearScreen
 
+            Uses Get-Content to monitor test.txt. Shows any changes and clears the screen between changes.
+
         .EXAMPLE
             Get-ChildItem | Watch-Command -Difference -AsString
 
+            Monitors the result of GEt-ChildItem for changes, returns any differences. Treats the input as
+            strings not objects.
+
         .EXAMPLE
             Get-Process | Watch-Command -Difference -Property processname,id -Continuous
+
+            Monitors Get-Process for differences in the specified properties only, continues until interrupted
+            by CTRL+C.
     #>
     [cmdletbinding()]
     Param(
