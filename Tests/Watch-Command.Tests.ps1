@@ -4,7 +4,8 @@ $PSVersion = $PSVersionTable.PSVersion.Major
 $Root = "$PSScriptRoot\..\"
 $Module = 'Watch'
 
-If (-not (Get-Module $Module)) { Import-Module "$Root\$Module" -Force }
+Get-Module $Module | Remove-Module -Force
+Import-Module "$Root\$Module" -Force
 
 Describe "Watch-Command PS$PSVersion" {
     
