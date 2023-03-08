@@ -1,6 +1,6 @@
 # Change Log
 
-## !Deploy
+## [1.0.30] - 2023-03-08
 
 * [Feature] Added a `-PassThru` parameter to `Watch-Command` so that the initial result is immediately returned, per the suggestion from [@th0th](https://github.com/th0th) in [#2](https://github.com/markwragg/PowerShell-Watch/issues/2)
 
