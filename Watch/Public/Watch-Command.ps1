@@ -29,6 +29,9 @@
         .PARAMETER ClearScreen
             Switch: Clears the screen between each result. You can also use 'cls' as an alias.
 
+        .PARAMETER PassThru
+            Switch: Passes through the initial result from the command (before any change has occurred).
+
         .PARAMETER Property
             Manually specify one or more property names to be used for comparison. If not specified,
             the default display property set is used. If there is not a default display property set,
@@ -84,6 +87,9 @@
         [switch]
         $ClearScreen,
 
+        [switch]
+        $PassThru,
+
         [string[]]
         $Property
     )
@@ -116,6 +122,9 @@
         Write-Verbose "Watched properties: $($Property -Join ',')"
     }
 
+    if ($PassThru) {
+        $FirstResult
+    }
 
     do {
         do {
