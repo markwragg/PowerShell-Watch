@@ -29,6 +29,9 @@
         .PARAMETER ClearScreen
             Switch: Clears the screen between each result. You can also use 'cls' as an alias.
 
+        .PARAMETER ClearScreenIfDifferent
+            Switch: Clears the screen before each different result.
+
         .PARAMETER PassThru
             Switch: Passes through the initial result from the command (before any change has occurred).
 
@@ -86,6 +89,9 @@
         [alias('cls')]
         [switch]
         $ClearScreen,
+
+        [switch]
+        $ClearScreenIfDifferent,
 
         [switch]
         $PassThru,
@@ -156,6 +162,10 @@
         until ($Diff)
 
         Write-Verbose "Change occurred at $(Get-Date)"
+
+        if ($ClearScreenIfDifferent) {
+            Clear-Host
+        }
 
         if ($Difference) {
             $Diff | Where-Object {$_.SideIndicator -eq '=>'}
