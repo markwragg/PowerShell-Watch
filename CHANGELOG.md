@@ -1,6 +1,6 @@
 # Change Log
 
-## !Deploy
+## [1.0.31] - 2024-08-31
 
 * [Fix] Fixed the `-ClearSceen` switch to only clear the screen after a difference has occurred when `-Diff` is used and before returning the first result when `-PassThru` is used. (Thanks [@ZHider](https://github.com/ZHider)!)
 
