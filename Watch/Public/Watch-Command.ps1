@@ -27,7 +27,7 @@
             Switch: Converts the result of the scriptblock into an array of strings for comparison.
 
         .PARAMETER ClearScreen
-            Switch: Clears the screen between each result. You can also use 'cls' as an alias.
+            Switch: Clears the screen between each different result. You can also use 'cls' as an alias.
 
         .PARAMETER PassThru
             Switch: Passes through the initial result from the command (before any change has occurred).
@@ -123,17 +123,16 @@
     }
 
     if ($PassThru) {
-        $FirstResult
+        if ($ClearScreen) {
+            Clear-Host
+        }
+        Write-Output $FirstResult
     }
 
     do {
         do {
             if ($Result) {
                 Start-Sleep $Seconds
-            }
-
-            if ($ClearScreen) {
-                Clear-Host
             }
 
             $Result = Invoke-Command $ScriptBlock
@@ -154,6 +153,10 @@
             $Diff = Compare-Object @CompareParams -PassThru
         }
         until ($Diff)
+
+        if ($ClearScreen) {
+            Clear-Host
+        }
 
         Write-Verbose "Change occurred at $(Get-Date)"
 

@@ -140,7 +140,7 @@ Accept wildcard characters: False
 ```
 
 ### -ClearScreen
-Switch: Clears the screen between each result.
+Switch: Clears the screen between each different result.
 You can also use 'cls' as an alias.
 
 ```yaml
