@@ -7,7 +7,7 @@ Runs a scriptblock or the preceeding pipeline repeatedly until there is change.
 
 ```
 Watch-Command [-ScriptBlock] <Object> [[-Seconds] <Int32>] [-Difference] [-Continuous] [-AsString]
- [-ClearScreen] [-ClearScreenIfDifferent] [-PassThru] [[-Property] <String[]>] [<CommonParameters>]
+ [-ClearScreen] [-PassThru] [[-Property] <String[]>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -140,27 +140,13 @@ Accept wildcard characters: False
 ```
 
 ### -ClearScreen
-Switch: Clears the screen between each result.
+Switch: Clears the screen between each different result.
 You can also use 'cls' as an alias.
 
 ```yaml
 Type: SwitchParameter
 Parameter Sets: (All)
 Aliases: cls
-
-Required: False
-Position: Named
-Default value: False
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -ClearScreenIfDifferent
-Switch: Clears the screen before each different result.
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: (All)
 
 Required: False
 Position: Named
