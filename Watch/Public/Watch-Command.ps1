@@ -123,6 +123,9 @@
     }
 
     if ($PassThru) {
+        if ($ClearScreen) {
+            Clear-Host
+        }
         Write-Output $FirstResult
     }
 
