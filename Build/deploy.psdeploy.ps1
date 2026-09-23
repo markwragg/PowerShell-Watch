@@ -1,8 +1,11 @@
 # Config file for PSDeploy
-# Set-BuildEnvironment from BuildHelpers module has populated ENV:BHModulePath and related variables
+# Set-BuildEnvironment from BuildHelpers module has populated ENV:BHModulePath and related variables.
+# $env:BHStagingModulePath is set by the psake 'Deploy' task when the combined module built by
+# CombineFunctionsAndStage is available -- a bare psake Properties variable wouldn't be visible here, since
+# Invoke-PSDeploy dot-sources this file from inside the PSDeploy module's own function scope.
 # Publish to gallery with a few restrictions
-if ($StagingModulePath) {
-    $ModuleSourcePath = $StagingModulePath
+if ($env:BHStagingModulePath -and (Test-Path $env:BHStagingModulePath)) {
+    $ModuleSourcePath = $env:BHStagingModulePath
 }
 else {
     $ModuleSourcePath = $env:BHPSModulePath

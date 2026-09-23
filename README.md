@@ -1,6 +1,6 @@
 # PowerShell-Watch
 
-[![Build Status](https://dev.azure.com/markwragg/GitHub/_apis/build/status/markwragg.PowerShell-Watch?branchName=master)](https://dev.azure.com/markwragg/GitHub/_build/latest?definitionId=8&branchName=master) ![Test Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg?maxAge=60)
+[![Build Status](https://dev.azure.com/markwragg/GitHub/_apis/build/status/markwragg.PowerShell-Watch?branchName=master)](https://dev.azure.com/markwragg/GitHub/_build/latest?definitionId=8&branchName=master) ![coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg?maxAge=60)
 
 This PowerShell module contains a `Watch-Command` cmdlet that can be used to repeatedly run a PowerShell command or scriptblock to return output when it has changed.
 
@@ -55,7 +55,7 @@ Get-Process | Watch-Command -Diff -Cont -Property id
 
 ![Watch-Command Get-Process Example](/Media/watch-command-get-process-id-continuous.png)
 
-This command will continually list output each time the id property of the output of `Get-Process` has changed (e.g a new process has started). 
+This command will continually list output each time the id property of the output of `Get-Process` has changed (e.g a new process has started).
 
 By default `Watch-Command` will use the Default Display Set of properties (if a set exists) as the properties to monitor. If a Default Display Set does not exist then it will use all properties. If you want to force the use of all properties you can specify `-Property *`.
 

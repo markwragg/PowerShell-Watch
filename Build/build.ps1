@@ -42,7 +42,11 @@ if ($PSBoundParameters.Keys -contains 'ResolveDependency') {
     $invokePSDependParams = @{
         Path    = $psdependencyConfigPath
         # Tags = 'Bootstrap'
-        Import  = $true
+        # Import: PSDepend's own bundled YamlDotNet.dll (loaded on `Import-Module PSDepend` above)
+        # conflicts with PlatyPS's newer bundled YamlDotNet.dll under PowerShell 7+ if PSDepend tries
+        # to import every dependency into this same process. Installing only and letting each task
+        # import/autoload what it needs (as they already do) avoids the clash.
+        Import  = $false
         Confirm = $false
         Install = $true
         # Verbose = $true

@@ -1,11 +1,6 @@
 variables:
 - group: powershell-gallery
 
-# Build Pipeline
-pool:
-  # What environment will the build agent run on? (Windows / Linux / macOS)
-  vmImage: "windows-latest"
-
 trigger:
   batch: true
 
@@ -15,61 +10,224 @@ trigger:
       # Any Pull Request merging into the master branch
       - master
 
-steps:
-  - checkout: self
-    persistCredentials: true
-    clean: true
-    
-  - powershell: |
-      .\Build\build.ps1 -ResolveDependency -TaskList 'Init'
-    displayName: "Install Dependencies"
+# Also build Pull Requests targeting master, so tests/analysis run before merge.
+# Steps that publish (wiki, gallery, commit-back) live only in the Build stage,
+# which is individually conditioned to skip when Build.Reason is 'PullRequest',
+# so a PR build only validates the change - it never pushes to the wiki, the
+# PowerShell Gallery, or the repo.
+pr:
+  branches:
+    include:
+      - master
 
-  - powershell: |
-      .\Build\build.ps1 -TaskList 'CombineFunctionsAndStage'
-    displayName: "Combine PowerShell functions into single module file"
+stages:
+  - stage: Test
+    jobs:
+      # Runs both Windows PowerShell and PowerShell Core, since only Windows has Windows PowerShell.
+      - job: Windows
+        pool:
+          vmImage: "windows-latest"
+        steps:
+          - checkout: self
+            clean: true
 
-  - powershell: |
-      .\Build\build.ps1 -TaskList 'Analyze'
-    displayName: "Analyze"
+          - pwsh: |
+              $modulesPath = ($env:PSModulePath -split [IO.Path]::PathSeparator) |
+                  Where-Object { $_ -like "$HOME*" } | Select-Object -First 1
+              Write-Host "##vso[task.setvariable variable=ModulesPath]$modulesPath"
+            displayName: "Set PowerShell Modules Cache Path"
 
-  - powershell: |
-      .\Build\build.ps1 -TaskList 'Test'
-    displayName: "Test"
+          - task: Cache@2
+            displayName: "Cache PowerShell Modules"
+            inputs:
+              key: 'pwshmodules | "$(Agent.OS)" | Build/build.depend.psd1'
+              restoreKeys: |
+                pwshmodules | "$(Agent.OS)"
+              path: "$(ModulesPath)"
 
-  - powershell: |
-      .\Build\build.ps1 -TaskList 'UpdateDocumentation'
-    displayName: "Update Documentation"
+          - pwsh: |
+              .\Build\build.ps1 -ResolveDependency -TaskList 'Init'
+            displayName: "Install Dependencies"
 
-  - powershell: |
-      .\Build\build.ps1 -TaskList 'Deploy'
-    displayName: "Deploy"
+          - pwsh: |
+              .\Build\build.ps1 -TaskList 'CombineFunctionsAndStage'
+            displayName: "Combine PowerShell functions into single module file"
 
-  - powershell: |
-      .\Build\build.ps1 -TaskList 'Commit'
-    displayName: "Commit Changes"
+          - pwsh: |
+              .\Build\build.ps1 -TaskList 'Analyze'
+            displayName: "Analyze"
 
-  - powershell: |
-      .\Build\build.ps1 -TaskList 'CreateBuildArtifact'
-    displayName: "Create Build Artifact"
+          - pwsh: |
+              .\Build\build.ps1 -TaskList 'Test'
+            name: TestCore
+            displayName: "Test PowerShell Core"
 
-  - task: PublishTestResults@2
-    displayName: "Publish Pester Tests"
-    inputs:
-      testRunner: "NUnit"
-      searchFolder: "Artifacts"
-      testRunTitle: "PesterTests"
-    condition: always()
+          - powershell: |
+              $modulesPath = ($env:PSModulePath -split [IO.Path]::PathSeparator) |
+                  Where-Object { $_ -like "$HOME*" } | Select-Object -First 1
+              Write-Host "##vso[task.setvariable variable=ModulesPath]$modulesPath"
+            displayName: "Set Windows PowerShell Modules Cache Path"
 
-  - task: PublishBuildArtifacts@1
-    displayName: "Publish Artifact: PowerShell Module Zipped for offline use"
-    inputs:
-      PathtoPublish: Artifacts
-      ArtifactName: Artifacts
-    condition: always()
+          - task: Cache@2
+            displayName: "Cache Windows PowerShell Modules"
+            inputs:
+              key: 'psmodules | "$(Agent.OS)" | Build/build.depend.psd1'
+              restoreKeys: |
+                psmodules | "$(Agent.OS)"
+              path: "$(ModulesPath)"
 
-  - task: PublishBuildArtifacts@1
-    displayName: "Publish Artifact: PowerShell Module"
-    inputs:
-      PathtoPublish: Staging
-      ArtifactName: PSModule
-    condition: always()
+          - powershell: |
+              .\Build\build.ps1 -ResolveDependency -TaskList 'Init'
+            displayName: "Install Dependencies"
+
+          - powershell: |
+              .\Build\build.ps1 -TaskList 'Test'
+            displayName: "Test Windows PowerShell"
+
+          - task: PublishTestResults@2
+            displayName: "Publish Pester Tests"
+            inputs:
+              testRunner: "NUnit"
+              testResultsFiles: "**/Test-Unit_*.xml"
+              searchFolder: "Artifacts"
+              testRunTitle: "PesterTests-Windows"
+            condition: always()
+
+      # PowerShell Core only - Windows PowerShell doesn't exist on Linux/macOS.
+      - job: CrossPlatform
+        strategy:
+          matrix:
+            Linux:
+              imageName: "ubuntu-latest"
+            macOS:
+              imageName: "macos-latest"
+        pool:
+          vmImage: "$(imageName)"
+        steps:
+          - checkout: self
+            clean: true
+
+          - pwsh: |
+              $modulesPath = ($env:PSModulePath -split [IO.Path]::PathSeparator) |
+                  Where-Object { $_ -like "$HOME*" } | Select-Object -First 1
+              Write-Host "##vso[task.setvariable variable=ModulesPath]$modulesPath"
+            displayName: "Set PowerShell Modules Cache Path"
+
+          - task: Cache@2
+            displayName: "Cache PowerShell Modules"
+            inputs:
+              key: 'pwshmodules | "$(Agent.OS)" | Build/build.depend.psd1'
+              restoreKeys: |
+                pwshmodules | "$(Agent.OS)"
+              path: "$(ModulesPath)"
+
+          - pwsh: |
+              ./Build/build.ps1 -ResolveDependency -TaskList 'Init'
+            displayName: "Install Dependencies"
+
+          - pwsh: |
+              ./Build/build.ps1 -TaskList 'CombineFunctionsAndStage'
+            displayName: "Combine PowerShell functions into single module file"
+
+          - pwsh: |
+              ./Build/build.ps1 -TaskList 'Analyze'
+            displayName: "Analyze"
+
+          - pwsh: |
+              ./Build/build.ps1 -TaskList 'Test'
+            displayName: "Test PowerShell Core"
+
+          - task: PublishTestResults@2
+            displayName: "Publish Pester Tests"
+            inputs:
+              testRunner: "NUnit"
+              testResultsFiles: "**/Test-Unit_*.xml"
+              searchFolder: "Artifacts"
+              testRunTitle: "PesterTests-$(Agent.OS)"
+            condition: always()
+
+  - stage: Build
+    dependsOn: Test
+    condition: succeeded()
+    variables:
+      # Coverage percentage computed by the Windows job's "Test PowerShell Core" (TestCore) step,
+      # carried across stages so the badge can be applied here without re-running the tests.
+      - name: CoveragePercent
+        value: $[ stageDependencies.Test.Windows.outputs['TestCore.CoveragePercent'] ]
+    jobs:
+      - job: Build
+        pool:
+          vmImage: "windows-latest"
+        steps:
+          - checkout: self
+            persistCredentials: true
+            clean: true
+
+          - pwsh: |
+              $modulesPath = ($env:PSModulePath -split [IO.Path]::PathSeparator) |
+                  Where-Object { $_ -like "$HOME*" } | Select-Object -First 1
+              Write-Host "##vso[task.setvariable variable=ModulesPath]$modulesPath"
+            displayName: "Set PowerShell Modules Cache Path"
+
+          - task: Cache@2
+            displayName: "Cache PowerShell Modules"
+            inputs:
+              key: 'pwshmodules | "$(Agent.OS)" | Build/build.depend.psd1'
+              restoreKeys: |
+                pwshmodules | "$(Agent.OS)"
+              path: "$(ModulesPath)"
+
+          - pwsh: |
+              .\Build\build.ps1 -ResolveDependency -TaskList 'Init'
+            displayName: "Install Dependencies"
+
+          - pwsh: |
+              .\Build\build.ps1 -TaskList 'CombineFunctionsAndStage'
+            displayName: "Combine PowerShell functions into single module file"
+
+          - pwsh: |
+              .\Build\build.ps1 -TaskList 'UpdateDocumentation'
+            displayName: "Update Documentation"
+
+          - pwsh: |
+              .\Build\build.ps1 -TaskList 'UpdateWiki'
+            displayName: "Update Wiki"
+            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+            env:
+              GITHUBPAT: $(GitHubPAT)
+
+          - pwsh: |
+              .\Build\build.ps1 -TaskList 'Deploy'
+            displayName: "Deploy"
+            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+            env:
+              NugetApiKey: $(NugetApiKey)
+
+          - pwsh: |
+              .\Build\build.ps1 -TaskList 'UpdateCoverageBadge'
+            displayName: "Update Coverage Badge"
+            env:
+              CoveragePercent: $(CoveragePercent)
+
+          - pwsh: |
+              .\Build\build.ps1 -TaskList 'Commit'
+            displayName: "Commit Changes"
+            condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+
+          - pwsh: |
+              .\Build\build.ps1 -TaskList 'CreateBuildArtifact'
+            displayName: "Create Build Artifact"
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Artifact: PowerShell Module Zipped for offline use"
+            inputs:
+              PathtoPublish: Artifacts
+              ArtifactName: Artifacts
+            condition: always()
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish Artifact: PowerShell Module"
+            inputs:
+              PathtoPublish: Staging
+              ArtifactName: PSModule
+            condition: always()

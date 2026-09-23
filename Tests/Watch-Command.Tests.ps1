@@ -1,67 +1,76 @@
 if (-not $PSScriptRoot) { $PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent }
 
 $PSVersion = $PSVersionTable.PSVersion.Major
-$Root = "$PSScriptRoot\..\"
+$Root = "$PSScriptRoot/../"
 $Module = 'Watch'
 
 Get-Module $Module | Remove-Module -Force
 Start-Sleep 5
 
-Import-Module $Root\$Module
+Import-Module $Root/$Module
 
 Describe "Watch-Command PS$PSVersion" {
-    
-    InModuleScope Watch {
-        
-        $InvokeCommand = Get-Command Invoke-Command
 
-        Mock Invoke-Command { & $InvokeCommand -ScriptBlock $ScriptBlock -ArgumentList $ArgumentList } -Verifiable
-        
+    InModuleScope Watch {
+
+        BeforeAll {
+            $InvokeCommand = Get-Command Invoke-Command
+            Mock Invoke-Command { & $InvokeCommand -ScriptBlock $ScriptBlock -ArgumentList $ArgumentList } -Verifiable
+        }
+
         Context 'Invoked via pipeline' {
-            
-            Get-Date | Select-Object Hour, Minute, Second | Watch-Command
+
+            BeforeAll {
+                Get-Date | Select-Object Hour, Minute, Second | Watch-Command
+            }
 
             It 'Should execute all verifiable mocks' {
-                Assert-VerifiableMock
+                Should -InvokeVerifiable
             }
             It 'Should call Invoke-Command at least 2 times' {
-                Assert-MockCalled Invoke-Command -Times 2
+                Should -Invoke Invoke-Command -Times 2 -Scope Context
             }
         }
 
         Context 'Invoked via scriptblock' {
-            
-            Watch-Command -ScriptBlock { Get-Date } -Difference -AsString
+
+            BeforeAll {
+                Watch-Command -ScriptBlock { Get-Date } -Difference -AsString
+            }
 
             It 'Should execute all verifiable mocks' {
-                Assert-VerifiableMock
+                Should -InvokeVerifiable
             }
             It 'Should call Invoke-Command at least 2 times' {
-                Assert-MockCalled Invoke-Command -Times 2
+                Should -Invoke Invoke-Command -Times 2 -Scope Context
             }
         }
 
         Context 'Invoked via wc Alias' {
-            
-            Get-Date | wc
+
+            BeforeAll {
+                Get-Date | wc
+            }
 
             It 'Should execute all verifiable mocks' {
-                Assert-VerifiableMock
+                Should -InvokeVerifiable
             }
             It 'Should call Invoke-Command at least 2 times' {
-                Assert-MockCalled Invoke-Command -Times 2
+                Should -Invoke Invoke-Command -Times 2 -Scope Context
             }
         }
 
         Context 'Invoked via watch Alias' {
-            
-            Get-Date | watch
+
+            BeforeAll {
+                Get-Date | watch
+            }
 
             It 'Should execute all verifiable mocks' {
-                Assert-VerifiableMock
+                Should -InvokeVerifiable
             }
             It 'Should call Invoke-Command at least 2 times' {
-                Assert-MockCalled Invoke-Command -Times 2
+                Should -Invoke Invoke-Command -Times 2 -Scope Context
             }
         }
 

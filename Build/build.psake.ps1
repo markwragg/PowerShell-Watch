@@ -1,3 +1,8 @@
+# Normalizes path separators/casing
+function ConvertTo-ComparablePath ([string]$Path) {
+    ($Path -replace '\\', '/').TrimEnd('/').ToLowerInvariant()
+}
+
 # PSake makes variables declared here available in other scriptblocks
 Properties {
     $ProjectRoot = $ENV:BHProjectPath
@@ -29,6 +34,9 @@ Properties {
 
     # Documentation
     $DocumentationPath = Join-Path -Path $ProjectRoot -ChildPath 'Documentation'
+
+    # Wiki (GitHub wikis are backed by a separate '<repo>.wiki.git' repository)
+    $WikiPath = Join-Path -Path $ProjectRoot -ChildPath 'wiki'
 }
 
 
@@ -110,7 +118,7 @@ Task 'ImportStagingModule' -Depends 'Init' {
     if (Get-Module -Name $env:BHProjectName) {
         Remove-Module -Name $env:BHProjectName
     }
-    # Global scope used for UpdateDocumentation (PlatyPS)
+    # Global scope used for UpdateDocumentation / UpdateWiki (PlatyPS)
     Import-Module -Name $StagingModulePath -ErrorAction 'Stop' -Force -Global
 }
 
@@ -151,20 +159,46 @@ Task 'Analyze' -Depends 'ImportStagingModule' {
 Task 'Test' -Depends 'ImportStagingModule' {
     $lines
 
+    Import-Module -Name 'Pester' -RequiredVersion '6.1.0' -Force
+
     # Gather test results. Store them in a variable and file
     $CodeFiles = (Get-ChildItem $ENV:BHModulePath -Recurse -Include '*.ps1').FullName
     $TestFilePath = Join-Path -Path $ArtifactFolder -ChildPath $TestFile
-    $TestResults = Invoke-Pester -Script $TestScripts -PassThru -CodeCoverage $CodeFiles -OutputFormat 'NUnitXml' -OutputFile $TestFilePath -PesterOption @{IncludeVSCodeMarker = $true }
+
+    $PesterConfiguration = New-PesterConfiguration
+    $PesterConfiguration.Run.Path = $TestScripts.FullName
+    $PesterConfiguration.Run.PassThru = $true
+    $PesterConfiguration.CodeCoverage.Enabled = $true
+    $PesterConfiguration.CodeCoverage.Path = $CodeFiles
+    $PesterConfiguration.TestResult.Enabled = $true
+    $PesterConfiguration.TestResult.OutputFormat = 'NUnitXml'
+    $PesterConfiguration.TestResult.OutputPath = $TestFilePath
+    $PesterConfiguration.Output.Verbosity = 'Detailed'
+
+    $TestResults = Invoke-Pester -Configuration $PesterConfiguration
 
     # Fail build if any tests fail
     if ($TestResults.FailedCount -gt 0) {
         Write-Error "Failed '$($TestResults.FailedCount)' tests, build failed"
     }
 
-    #Update readme.md with Code Coverage result
-    $CoveragePercent = [math]::floor(100 - (($TestResults.CodeCoverage.NumberOfCommandsMissed / $TestResults.CodeCoverage.NumberOfCommandsAnalyzed) * 100))
+    # Surface the coverage result as a pipeline output variable so a later stage (which runs in a
+    # separate, discarded workspace) can apply it to README.md without re-running the tests.
+    $CoveragePercent = [math]::floor($TestResults.CodeCoverage.CoveragePercent)
 
-    Set-ShieldsIoBadge -Path (Join-Path $ProjectRoot 'README.md') -Subject 'coverage' -Status $CoveragePercent -AsPercentage
+    Write-Host "##vso[task.setvariable variable=CoveragePercent;isOutput=true]$CoveragePercent"
+}
+
+
+# Update the coverage badge in README.md using a coverage percentage computed by an earlier Test task
+Task 'UpdateCoverageBadge' -Depends 'Init' {
+    $lines
+
+    if (-not $env:CoveragePercent) {
+        throw "CoveragePercent environment variable not set. Run the 'Test' task first and pass its coverage output through."
+    }
+
+    Set-ShieldsIoBadge -Path (Join-Path $ProjectRoot 'README.md') -Subject 'coverage' -Status $env:CoveragePercent -AsPercentage
 }
 
 
@@ -173,7 +207,7 @@ Task 'UpdateDocumentation' -Depends 'ImportStagingModule' {
     $lines
     Write-Output "Updating Markdown help in Staging folder: [$DocumentationPath]`n"
 
-    If (Test-Path $DocumentationPath) {
+    if (Test-Path $DocumentationPath) {
         Remove-Item -Path $DocumentationPath -Recurse -Force -ErrorAction 'SilentlyContinue'
         Start-Sleep -Seconds 5
     }
@@ -188,6 +222,109 @@ Task 'UpdateDocumentation' -Depends 'ImportStagingModule' {
         NoMetadata   = $true
     }
     New-MarkdownHelp @platyPSParams -ErrorAction 'SilentlyContinue' -Verbose | Out-Null
+}
+
+
+# Generate markdown help from comment-based help and publish it to the GitHub wiki.
+# GitHub wikis are backed by a separate '<repo>.wiki.git' repository, so this clones
+# that repo, regenerates the function reference pages with PlatyPS, and pushes the result.
+Task 'UpdateWiki' -Depends 'ImportStagingModule' {
+    $lines
+
+    if (-not $env:GITHUBPAT) {
+        Write-Warning 'GITHUBPAT environment variable not set. Skipping wiki update.'
+        return
+    }
+
+    # Derive the wiki repo URL from the main repo's origin remote.
+    $OriginUrl = (git config --get remote.origin.url) -replace '\.git$', ''
+    $WikiUrl = "$OriginUrl.wiki.git"
+    $AuthedWikiUrl = $WikiUrl -replace '^https://', "https://x-access-token:$($env:GITHUBPAT)@"
+
+    # Safety check: refuse to continue unless the derived URL is unambiguously a wiki
+    # repo and distinct from the main repo. This is what would have caught the bug above.
+    if ($WikiUrl -notmatch '\.wiki\.git$' -or $WikiUrl -eq (git config --get remote.origin.url)) {
+        throw "Failed to derive a valid wiki repository URL from the main repo's origin remote. Refusing to continue, to avoid publishing to the main repository instead of its wiki."
+    }
+
+    Write-Output "Cloning wiki repo: [$WikiUrl] to [$WikiPath]`n"
+
+    if (Test-Path $WikiPath) {
+        Remove-Item -Path $WikiPath -Recurse -Force -ErrorAction 'SilentlyContinue'
+    }
+
+    git clone $AuthedWikiUrl $WikiPath
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to clone wiki repo [$WikiUrl]. Ensure the Wiki feature is enabled for the repository and at least one page has been created manually via the GitHub UI to initialize it."
+    }
+
+    # Confirm the clone actually produced a usable git repository before generating anything into it.
+    # Without this check, a silently-failed clone could leave downstream steps operating on $ProjectRoot instead.
+    if (-not (Test-Path (Join-Path $WikiPath '.git'))) {
+        throw "Wiki clone did not produce a git repository at [$WikiPath]. Aborting before publishing anything, to avoid committing wiki pages to the main repository."
+    }
+
+    $ResolvedWikiPath = (Resolve-Path $WikiPath).Path
+
+    # Remove previously generated function reference pages, leaving any manually authored pages (e.g. Home.md) untouched
+    $ModuleFunctions = Get-ChildItem -Path "$env:BHModulePath\Public\*.ps1", "$env:BHModulePath\Private\*.ps1" -Recurse -ErrorAction 'SilentlyContinue'
+
+    foreach ($Function in $ModuleFunctions) {
+        Remove-Item -Path (Join-Path $WikiPath "$($Function.BaseName).md") -Force -ErrorAction 'SilentlyContinue'
+    }
+
+    # Create new wiki pages
+    $platyPSParams = @{
+        Module       = $env:BHProjectName
+        OutputFolder = $ResolvedWikiPath
+        NoMetadata   = $true
+    }
+    New-MarkdownHelp @platyPSParams -ErrorAction 'Stop' -Verbose | Out-Null
+
+    # Confirm PlatyPS actually wrote a page for every exported (Public) function into the
+    # wiki clone. Private functions aren't exported, so PlatyPS never generates pages for
+    # them - only Public functions are checked here. Checking specific expected filenames
+    # (rather than "any *.md exists") avoids a false pass from the pre-existing,
+    # manually-authored Home.md alone.
+    $PublicFunctions = @( Get-ChildItem -Path "$env:BHModulePath\Public\*.ps1" -Recurse -ErrorAction 'SilentlyContinue' )
+    $MissingPages = @( $PublicFunctions | Where-Object {
+            -not (Test-Path (Join-Path $ResolvedWikiPath "$($_.BaseName).md"))
+        }
+    )
+    if ($MissingPages.Count -gt 0) {
+        throw "New-MarkdownHelp did not produce pages for: $($MissingPages.BaseName -join ', ') in [$ResolvedWikiPath]. Aborting before publishing anything."
+    }
+
+    Push-Location $ResolvedWikiPath -ErrorAction 'Stop'
+    try {
+        # Safety check: refuse to publish unless we are verifiably inside the wiki clone. This guards
+        # against ever again committing/pushing wiki pages to the main repository if the location change
+        # above were to silently no-op.
+        $CurrentRepoRoot = git rev-parse --show-toplevel
+        if ((ConvertTo-ComparablePath $CurrentRepoRoot) -ne (ConvertTo-ComparablePath $ResolvedWikiPath)) {
+            throw "Refusing to publish: current git repository [$CurrentRepoRoot] does not match the wiki clone [$ResolvedWikiPath]."
+        }
+
+        git config user.email "build@azuredevops.com"
+        git config user.name "AzureDevOps"
+        git add -A
+
+        if (git status --porcelain) {
+            git commit -m "[skip ci] AzureDevOps Build $($env:BUILD_BUILDID)"
+            git push
+
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to push changes to wiki repo [$WikiUrl]."
+            }
+        }
+        else {
+            Write-Output 'No wiki changes to publish.'
+        }
+    }
+    finally {
+        Pop-Location
+    }
 }
 
 
@@ -232,14 +369,36 @@ Task 'Deploy' -Depends 'Init' {
     # Bump the module version
     try {
         $Version = Get-NextPSGalleryVersion -Name $env:BHProjectName -ErrorAction 'Stop'
+
+        # Ensure the next deploy is at least 1.1.0. Once the Gallery has a 1.1.0+ release published, Get-NextPSGalleryVersion will always be >= this floor
+        # on its own, so this check becomes a no-op and doesn't need to be removed later.
+        $MinimumVersion = [Version]'1.1.0'
+        if ($Version -lt $MinimumVersion) { $Version = $MinimumVersion }
+
         Update-Metadata -Path $env:BHPSModuleManifest -PropertyName 'ModuleVersion' -Value $Version -ErrorAction 'Stop'
     }
     catch {
         throw "Failed to update version for '$env:BHProjectName': $_.`n"
     }
 
+    # deploy.psdeploy.ps1 publishes the combined module built by CombineFunctionsAndStage, not the source --
+    # its manifest was copied from source before this task bumped the version above, so it needs the same
+    # updates applied to it directly too.
+    if (Test-Path $StagingModuleManifestPath) {
+        Set-ModuleFunctions -Name $StagingModuleManifestPath
+        Update-Metadata -Path $StagingModuleManifestPath -PropertyName 'ModuleVersion' -Value $Version -ErrorAction 'Stop'
+
+        # Invoke-PSDeploy runs deploy.psdeploy.ps1 from inside the PSDeploy module's own function scope, which
+        # can't see this task's local $StagingModulePath -- module scope boundaries block that. An environment
+        # variable crosses the boundary instead.
+        $env:BHStagingModulePath = $StagingModulePath
+    }
+    else {
+        Write-Warning "Staging module not found at [$StagingModulePath] -- run the CombineFunctionsAndStage task first. Falling back to publishing directly from source."
+    }
+
     if (Get-Item "$ProjectRoot/CHANGELOG.md") {
-        
+
         $ChangeLog = Get-Content "$ProjectRoot/CHANGELOG.md"
 
         if ($ChangeLog -contains '## !Deploy') {

@@ -1,6 +1,7 @@
-﻿$Public = @( Get-ChildItem -Path "$PSScriptRoot\Public\*.ps1" -Recurse )
+﻿$Public = @( Get-ChildItem -Path "$PSScriptRoot/Public/*.ps1" -Recurse )
+$Private = @( Get-ChildItem -Path "$PSScriptRoot/Private/*.ps1" -Recurse -ErrorAction 'SilentlyContinue' )
 
-$Public | ForEach-Object {
+@($Public + $Private) | ForEach-Object {
     try {
         . $_.FullName
     }
@@ -9,13 +10,5 @@ $Public | ForEach-Object {
     }
 }
 
-if (-not (Test-Path alias:Watch)) {
-    New-Alias -Name 'Watch' -Value 'Watch-Command'
-    Export-ModuleMember -Function $Public.BaseName -Alias 'Watch'
-}
-
-if (-not (Test-Path alias:wc)) {
-    New-Alias -Name 'wc' -Value 'Watch-Command'
-    Export-ModuleMember -Function $Public.BaseName -Alias 'wc'
-}
+Export-ModuleMember -Function $Public.BaseName
 
