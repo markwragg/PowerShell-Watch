@@ -1,5 +1,9 @@
 # Change Log
 
+## !Deploy
+
+* [Fix] Fixed `Watch-Command` repeatedly throwing `Compare-Object` errors (and never detecting a change) when the default "compare all properties" fallback picked up live-computed properties, such as a `FileInfo`'s `Target`/`LinkType`, which throw when accessed after the watched item has been deleted. Fixes [#3](https://github.com/markwragg/PowerShell-Watch/issues/3) (Thanks [@gregor-hh](https://github.com/gregor-hh)!)
+
 ## [1.0.31] - 2024-08-31
 
 * [Fix] Fixed the `-ClearSceen` switch to only clear the screen after a difference has occurred when `-Diff` is used and before returning the first result when `-PassThru` is used. (Thanks [@ZHider](https://github.com/ZHider)!)

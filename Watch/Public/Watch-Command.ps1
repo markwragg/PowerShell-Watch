@@ -115,8 +115,16 @@
             $Property = ($FirstResult | Select-Object -First 1).PSStandardMembers.DefaultDisplayPropertySet.ReferencedPropertyNames
         }
 
-        if (-not $Property -or $Property -eq '*') {
+        if ($Property -eq '*') {
             $Property = ($FirstResult | Select-Object -First 1).PSObject.Properties.Name
+        }
+        elseif (-not $Property) {
+            # Excludes ScriptProperty/CodeProperty/AliasProperty members (e.g. a FileInfo's Target/LinkType),
+            # which are computed live from the filesystem on every access and throw if the item has since
+            # been deleted, rather than comparing against a snapshot of the value. See issue #3.
+            $Property = ($FirstResult | Select-Object -First 1).PSObject.Properties |
+                Where-Object MemberType -In 'Property', 'NoteProperty' |
+                Select-Object -ExpandProperty Name
         }
 
         Write-Verbose "Watched properties: $($Property -Join ',')"
