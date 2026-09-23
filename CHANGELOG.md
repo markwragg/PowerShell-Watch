@@ -1,6 +1,6 @@
 # Change Log
 
-## !Deploy
+## [1.1.0] - 2026-09-23
 
 * [Fix] Fixed `Watch-Command` repeatedly throwing `Compare-Object` errors (and never detecting a change) when the default "compare all properties" fallback picked up live-computed properties, such as a `FileInfo`'s `Target`/`LinkType`, which throw when accessed after the watched item has been deleted. Fixes [#3](https://github.com/markwragg/PowerShell-Watch/issues/3) (Thanks [@gregor-hh](https://github.com/gregor-hh)!)
 
