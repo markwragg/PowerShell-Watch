@@ -179,7 +179,7 @@ Task 'Test' -Depends 'ImportStagingModule' {
 
     # Fail build if any tests fail
     if ($TestResults.FailedCount -gt 0) {
-        Write-Error "Failed '$($TestResults.FailedCount)' tests, build failed"
+        throw "Failed '$($TestResults.FailedCount)' tests, build failed"
     }
 
     # Surface the coverage result as a pipeline output variable so a later stage (which runs in a
