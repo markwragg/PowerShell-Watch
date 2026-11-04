@@ -1,1 +1,4 @@
-coverage.xml
+# .gitignore file
+
+/**/coverage.xml
+/Staging/*

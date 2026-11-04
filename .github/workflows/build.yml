@@ -1,0 +1,172 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  DeployBranch: master
+
+jobs:
+  test-windows-powershell:
+    runs-on: windows-latest
+    outputs:
+      CoveragePercent: ${{ steps.test-winps.outputs.CoveragePercent }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve Windows PowerShell modules path
+        id: modules-path-winps
+        shell: powershell
+        run: |
+          $modulesPath = ($env:PSModulePath -split [IO.Path]::PathSeparator) |
+            Where-Object { $_ -like "$HOME*" } | Select-Object -First 1
+          "path=$modulesPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Cache Windows PowerShell modules
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.modules-path-winps.outputs.path }}
+          key: psmodules-${{ runner.os }}-${{ hashFiles('Build/build.depend.psd1') }}
+          restore-keys: psmodules-${{ runner.os }}-
+
+      - name: Install Dependencies
+        shell: powershell
+        run: ./Build/build.ps1 -ResolveDependency -TaskList 'Init'
+
+      - name: Combine PowerShell functions into single module file
+        shell: powershell
+        run: ./Build/build.ps1 -TaskList 'CombineFunctionsAndStage'
+
+      - name: Analyze
+        shell: powershell
+        run: ./Build/build.ps1 -TaskList 'Analyze'
+
+      - name: Test Windows PowerShell
+        id: test-winps
+        shell: powershell
+        run: ./Build/build.ps1 -TaskList 'Test'
+
+  test-crossplatform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve PowerShell modules path
+        id: modules-path
+        shell: pwsh
+        run: |
+          $modulesPath = ($env:PSModulePath -split [IO.Path]::PathSeparator) |
+            Where-Object { $_ -like "$HOME*" } | Select-Object -First 1
+          "path=$modulesPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Cache PowerShell modules
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.modules-path.outputs.path }}
+          key: pwshmodules-${{ runner.os }}-${{ hashFiles('Build/build.depend.psd1') }}
+          restore-keys: pwshmodules-${{ runner.os }}-
+
+      - name: Install Dependencies
+        shell: pwsh
+        run: ./Build/build.ps1 -ResolveDependency -TaskList 'Init'
+
+      - name: Combine PowerShell functions into single module file
+        shell: pwsh
+        run: ./Build/build.ps1 -TaskList 'CombineFunctionsAndStage'
+
+      - name: Test PowerShell Core
+        shell: pwsh
+        run: ./Build/build.ps1 -TaskList 'Test'
+
+  build:
+    needs: [test-windows-powershell, test-crossplatform]
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      CoveragePercent: ${{ needs.test-windows-powershell.outputs.CoveragePercent }}
+      NugetApiKey: ${{ secrets.NUGET_API_KEY }}
+      GITHUBPAT: ${{ secrets.GH_PAT }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: true
+
+      - name: Resolve project name
+        id: project
+        shell: pwsh
+        run: |
+          $ProjectName = (Get-ChildItem -Path . -Filter '*.psd1' -Recurse -Depth 1 |
+            Where-Object { $_.BaseName -eq $_.Directory.Name }).BaseName
+          "name=$ProjectName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Resolve PowerShell Core modules path
+        id: modules-path
+        shell: pwsh
+        run: |
+          $modulesPath = ($env:PSModulePath -split [IO.Path]::PathSeparator) |
+            Where-Object { $_ -like "$HOME*" } | Select-Object -First 1
+          "path=$modulesPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Cache PowerShell Core modules
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.modules-path.outputs.path }}
+          key: pwshmodules-${{ runner.os }}-${{ hashFiles('Build/build.depend.psd1') }}
+          restore-keys: pwshmodules-${{ runner.os }}-
+
+      - name: Install Dependencies
+        shell: pwsh
+        run: ./Build/build.ps1 -ResolveDependency -TaskList 'Init'
+
+      - name: Combine PowerShell functions into single module file
+        shell: pwsh
+        run: ./Build/build.ps1 -TaskList 'CombineFunctionsAndStage'
+
+      - name: Update Documentation
+        shell: pwsh
+        run: ./Build/build.ps1 -TaskList 'UpdateDocumentation'
+
+      - name: Update Wiki
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: ./Build/build.ps1 -TaskList 'UpdateWiki'
+
+      - name: Deploy
+        id: deploy
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: ./Build/build.ps1 -TaskList 'Deploy'
+
+      - name: Update Coverage Badge
+        shell: pwsh
+        run: ./Build/build.ps1 -TaskList 'UpdateCoverageBadge'
+
+      - name: Commit Changes
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: ./Build/build.ps1 -TaskList 'Commit'
+
+      - name: Create Build Artifact
+        shell: pwsh
+        run: ./Build/build.ps1 -TaskList 'CreateBuildArtifact'
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && steps.deploy.outputs.DidDeploy == 'true'
+        shell: pwsh
+        run: ./Build/build.ps1 -TaskList 'GitHubRelease'
+
+      - name: Publish Artifact - Zipped module
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.project.outputs.name }}
+          path: Artifacts
