@@ -107,7 +107,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'https://github.com/markwragg/Powershell-Watch/blob/master/README.md'
+        ReleaseNotes = 'https://github.com/markwragg/PowerShell-Watch/blob/master/CHANGELOG.md'
 
         # Prerelease string of this module
         # Prerelease = ''
