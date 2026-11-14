@@ -11,11 +11,11 @@ This PowerShell module contains a `Watch-Command` cmdlet that can be used to rep
 
 ![Watch-Command Get-Service Example](/Media/watch-command-get-service-continuous.png)
 
-
 ## Installation
 
 The module is published in the PSGallery, so if you have PowerShell 5 can be installed by running:
-```
+
+```powershell
 Install-Module Watch -Scope CurrentUser
 ```
 
@@ -23,7 +23,7 @@ Install-Module Watch -Scope CurrentUser
 
 You can use the `Watch-Command` cmdlet by providing it with a ScriptBlock. For example:
 
-```
+```powershell
 Watch-Command -ScriptBlock { Get-Process }
 ```
 
@@ -31,7 +31,7 @@ Alternatively ,the cmdlet has been designed so that if it is sent any input via 
 
 This is for convenience, so that you can quickly and easily add `| Watch-Command` (or its Aliases `| watch` or `| wc`) to the end of an existing set of commands to run them repeatedly and output once a change has occurred. For example:
 
-```
+```powershell
 Get-Service | wc
 ```
 
@@ -44,7 +44,8 @@ You can have the script return only objects in a collection that have changed or
 If you use `-Verbose` you will see a timestamp in the console prior to a change being output (particularly useful when using `-Continuous` and `-Difference`).
 
 For example:
-```
+
+```powershell
 Get-Service | Watch-Command -Diff -Cont -Verbose
 ```
 This command will continually list output each time one of the default properties of a service has changed state. Verbose statements above each change will show when they occurred.
@@ -54,7 +55,7 @@ By default the cmdlet uses the `Compare-Object` cmdlet to perform the comparison
 If you want to specify specific properties to monitor for change, you can do so via the `-Property` parameter.
 
 For example:
-```
+```powershell
 Get-Process | Watch-Command -Diff -Cont -Property id
 ```
 
@@ -65,6 +66,10 @@ This command will continually list output each time the id property of the outpu
 By default `Watch-Command` will use the Default Display Set of properties (if a set exists) as the properties to monitor. If a Default Display Set does not exist then it will use all properties. If you want to force the use of all properties you can specify `-Property *`.
 
 You can also use Watch-Command to monitor non-PowerShell command output (which will generally be treated as strings). Here's an example of monitoring the output of ipconfig /all for a change to the DNS server addresses:
+
+```powershell
+ipconfig /all | Watch-Command -Verbose -Diff -Cont -Seconds 5
+```
 
 ![Watch-Command ipconfig Example](/Media/watch-command-ipconfig.png)
 
