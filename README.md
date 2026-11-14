@@ -1,5 +1,7 @@
 # PowerShell-Watch
 
+[<img src="watch-logo.png" align="right" width="100">](https://www.powershellgallery.com/packages/watch)
+
 [![Build Status](https://github.com/markwragg/PowerShell-Watch/actions/workflows/build.yml/badge.svg)](https://github.com/markwragg/PowerShell-Watch/actions/workflows/build.yml)
 ![coverage](https://img.shields.io/badge/coverage-98%25-brightgreen.svg)
 [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/watch?label=PS%20Gallery)](https://www.powershellgallery.com/packages/watch)
