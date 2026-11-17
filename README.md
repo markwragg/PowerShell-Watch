@@ -29,15 +29,39 @@ Install-PSResource Watch
 
 The module includes the following cmdlets / aliases:
 
-Cmdlet        | Description
---------------|-------------------------------------------------------------------------------
-Watch-Command | Runs a scriptblock or the preceding pipeline repeatedly until there is change.
-watch         | Alias for Watch-Command
-wc            | Alias for Watch-Command
+Cmdlet          | Description
+----------------|-------------------------------------------------------------------------------
+`Watch-Command` | Runs a scriptblock or the preceding pipeline repeatedly until there is change.
+`watch`         | Alias for `Watch-Command`
+`wc`            | Alias for `Watch-Command`
 
 > [!NOTE]
 > On Linux and macOS, PowerShell aliases take precedence over native commands, so while this module is imported `watch` and `wc` will run `Watch-Command` rather than the native `watch` and `wc` (word count) utilities. Use the full path (e.g. `/usr/bin/wc`) to run the native commands, or unload the module (`Remove-Module Watch`).
 
+## Parameters
+
+`Watch-Command` (aliases: `watch`, `wc`) has the following parameters:
+
+Parameter        | Description
+-----------------|----------------------------------------------------------------------------------
+`-ScriptBlock`   | The scriptblock to run. Can be omitted when using the [pipeline shorthand](#pipeline-shorthand).
+`-Seconds`       | Number of seconds to wait between checks. Default: `1`.
+`-Difference`    | Output only the items that have been added or changed.
+`-ChangeSummary` | Output each change as an object describing what was added, removed or modified.
+`-Key`           | One or more properties that uniquely identify an item, used to detect modifications. Implies `-ChangeSummary`.
+`-Continuous`    | Keep running after a change has occurred, until interrupted with CTRL+C.
+`-AsString`      | Convert the result into an array of strings before comparing.
+`-ClearScreen`   | Clear the screen before each change is output. Alias: `-cls`.
+`-PassThru`      | Return the initial result immediately, before any change has occurred.
+`-Property`      | One or more property names to compare. Use `*` for all properties.
+
+Some parameters can't be combined. These rules are enforced by parameter sets, so `Get-Help Watch-Command` shows each valid combination:
+
+- `-ChangeSummary` and `-Difference` are mutually exclusive.
+- `-Key` implies `-ChangeSummary`, so it can't be used with `-Difference` either.
+- `-Key` can't be used with `-AsString`.
+
+See [Documentation/Watch-Command.md](Documentation/Watch-Command.md) or run `Get-Help Watch-Command -Full` for the full reference.
 
 ## Usage
 
@@ -165,26 +189,3 @@ ipconfig /all | Watch-Command -Verbose -Difference -Continuous -Seconds 5
 ![Watch-Command ipconfig Example](/Media/watch-command-ipconfig.png)
 
 To force `Watch-Command` to treat the result of any command as an array of strings, regardless of the object type returned, use the `-AsString` parameter.
-
-## Parameters
-
-Parameter      | Description
----------------|----------------------------------------------------------------------------------
--ScriptBlock   | The scriptblock to run. Can be omitted when using the [pipeline shorthand](#pipeline-shorthand).
--Seconds       | Number of seconds to wait between checks. Default: `1`.
--Difference    | Output only the items that have been added or changed.
--ChangeSummary | Output each change as an object describing what was added, removed or modified.
--Key           | One or more properties that uniquely identify an item, used to detect modifications. Implies `-ChangeSummary`.
--Continuous    | Keep running after a change has occurred, until interrupted with CTRL+C.
--AsString      | Convert the result into an array of strings before comparing.
--ClearScreen   | Clear the screen before each change is output. Alias: `-cls`.
--PassThru      | Return the initial result immediately, before any change has occurred.
--Property      | One or more property names to compare. Use `*` for all properties.
-
-Some parameters can't be combined. These rules are enforced by parameter sets, so `Get-Help Watch-Command` shows each valid combination:
-
-- `-ChangeSummary` and `-Difference` are mutually exclusive.
-- `-Key` implies `-ChangeSummary`, so it can't be used with `-Difference` either.
-- `-Key` can't be used with `-AsString`.
-
-See [Documentation/Watch-Command.md](Documentation/Watch-Command.md) or run `Get-Help Watch-Command -Full` for the full reference.
