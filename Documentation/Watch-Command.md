@@ -1,12 +1,31 @@
 # Watch-Command
 
 ## SYNOPSIS
-Runs a scriptblock or the preceeding pipeline repeatedly until there is change.
+Runs a scriptblock or the preceding pipeline repeatedly until there is change.
 
 ## SYNTAX
 
+### Default (Default)
+```
+Watch-Command [-ScriptBlock] <Object> [[-Seconds] <Int32>] [-Continuous] [-AsString] [-ClearScreen] [-PassThru]
+ [[-Property] <String[]>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
+```
+
+### Difference
 ```
 Watch-Command [-ScriptBlock] <Object> [[-Seconds] <Int32>] [-Difference] [-Continuous] [-AsString]
+ [-ClearScreen] [-PassThru] [[-Property] <String[]>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
+```
+
+### ChangeSummaryKey
+```
+Watch-Command [-ScriptBlock] <Object> [[-Seconds] <Int32>] [-ChangeSummary] -Key <String[]> [-Continuous]
+ [-ClearScreen] [-PassThru] [[-Property] <String[]>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
+```
+
+### ChangeSummary
+```
+Watch-Command [-ScriptBlock] <Object> [[-Seconds] <Int32>] [-ChangeSummary] [-Continuous] [-AsString]
  [-ClearScreen] [-PassThru] [[-Property] <String[]>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
 ```
 
@@ -22,7 +41,7 @@ For the command to work the specified scriptblock must return a result to the pi
 Watch-Command -ScriptBlock { Get-Process }
 ```
 
-Runs Get-Process and waits for any returns the result when the data has changed.
+Runs Get-Process and returns the result when the data has changed.
 
 ### EXAMPLE 2
 ```
@@ -45,7 +64,7 @@ Shows any changes and clears the screen between changes.
 Get-ChildItem | Watch-Command -Difference -AsString
 ```
 
-Monitors the result of GEt-ChildItem for changes, returns any differences.
+Monitors the result of Get-ChildItem for changes, returns any differences.
 Treats the input as
 strings not objects.
 
@@ -57,12 +76,25 @@ Get-Process | Watch-Command -Difference -Property processname,id -Continuous
 Monitors Get-Process for differences in the specified properties only, continues until interrupted
 by CTRL+C.
 
+### EXAMPLE 6
+```
+Get-ChildItem C:\Temp | Watch-Command -ChangeSummary -Key Name -Continuous
+```
+
+Monitors a folder and reports each change as an 'Added', 'Removed' or 'Modified' object,
+including which properties changed and their previous/current values, continuously until
+interrupted by CTRL+C.
+
+Parameter sets enforce the valid combinations: -Difference and -ChangeSummary are mutually
+exclusive, -Key implies -ChangeSummary (so can't be combined with -Difference), and -Key can't be
+combined with -AsString.
+
 ## PARAMETERS
 
 ### -ScriptBlock
 The scriptblock to execute, specified via curly braces.
-If you provide input via the pipleine that
-isn't a scriptblock then the entire invocation line that preceeded the cmdlet will be used as the
+If you provide input via the pipeline that
+isn't a scriptblock then the entire invocation line that preceded the cmdlet will be used as the
 scriptblock input.
 
 ```yaml
@@ -95,16 +127,78 @@ Accept wildcard characters: False
 
 ### -Difference
 Switch: Use to only output items in the collection that have changed
-dditions or modifications).
+(additions or modifications).
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: (All)
+Parameter Sets: Difference
+Aliases:
+
+Required: True
+Position: Named
+Default value: False
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ChangeSummary
+Switch: Instead of returning raw objects, reports each change as a clean object with
+DetectedAt (when the change was detected), ChangeType ('Added', 'Removed' or 'Modified'), Key,
+ChangedProperties, Changes (each changed property with its PreviousValue and CurrentValue), and
+the whole item before and after the change as PreviousItem and CurrentItem.
+Unlike -Difference,
+this also reports items that were removed.
+Cannot be combined with -Difference.
+
+-Key is optional.
+Without it, changes are only reported as 'Added' or 'Removed' (a changed item
+appears as its old version removed and its new version added), and Key, ChangedProperties and
+Changes are $null.
+With -Key, items are paired up between checks, so a changed item is reported
+as 'Modified', with its key value in Key, the names of the properties that changed in
+ChangedProperties, and their previous and current values in Changes.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: ChangeSummaryKey
 Aliases:
 
 Required: False
 Position: Named
 Default value: False
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: ChangeSummary
+Aliases:
+
+Required: True
+Position: Named
+Default value: False
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Key
+One or more property names that uniquely identify an item across checks (e.g.
+Name or Id).
+Items are paired up by this key between checks so that in-place changes are reported as
+'Modified' (with the specific properties that changed) rather than appearing as an unrelated
+removal and addition.
+Implies -ChangeSummary, so specifying -ChangeSummary as well is optional.
+Cannot be used with -Difference or -AsString.
+
+```yaml
+Type: String[]
+Parameter Sets: ChangeSummaryKey
+Aliases:
+
+Required: True
+Position: Named
+Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
@@ -129,7 +223,7 @@ Switch: Converts the result of the scriptblock into an array of strings for comp
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: (All)
+Parameter Sets: Default, Difference, ChangeSummary
 Aliases:
 
 Required: False
