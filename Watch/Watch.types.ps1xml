@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Type extensions for the objects Watch-Command emits. Defined here once rather than with Add-Member on
+    every object, which would cost time for each changed property on every check.
+-->
+<Types>
+    <Type>
+        <Name>Watch.PropertyChange</Name>
+        <Members>
+            <!-- So a change reads as e.g. 'Length: 5 -> 10' when shown nested in a change summary. -->
+            <ScriptMethod>
+                <Name>ToString</Name>
+                <Script>"$($this.Property): $($this.PreviousValue) -> $($this.CurrentValue)"</Script>
+            </ScriptMethod>
+        </Members>
+    </Type>
+</Types>

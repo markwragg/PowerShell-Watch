@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Default view for the objects Watch-Command emits with -ChangeSummary.
+
+    Fixed column widths matter here, not just appearance: without a defined view, Format-Table
+    (implicit or explicit) buffers objects to measure column widths, and only releases them when the
+    next object arrives or the pipeline ends. With -Continuous the pipeline never ends, so each change
+    would be held back until the following one. A view with fixed widths lets every row render as
+    soon as it is emitted.
+-->
+<Configuration>
+    <ViewDefinitions>
+        <View>
+            <Name>Watch.ChangeSummary</Name>
+            <ViewSelectedBy>
+                <TypeName>Watch.ChangeSummary</TypeName>
+            </ViewSelectedBy>
+            <TableControl>
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>Time</Label>
+                        <Width>8</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>ChangeType</Label>
+                        <Width>10</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Key</Label>
+                        <Width>25</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>ChangedProperties</Label>
+                        <Width>25</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Item</Label>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.DetectedAt.ToString('HH:mm:ss')</ScriptBlock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>ChangeType</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>
+                                    # A composite key (multiple -Key properties) is an object; show it as Name=Value pairs.
+                                    if ($_.Key -is [System.Management.Automation.PSCustomObject]) {
+                                        ($_.Key.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', '
+                                    }
+                                    else {
+                                        $_.Key
+                                    }
+                                </ScriptBlock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.ChangedProperties -join ', '</ScriptBlock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>
+                                    $Item = if ($null -ne $_.CurrentItem) { $_.CurrentItem } else { $_.PreviousItem }
+                                    # FileSystemInfo.ToString() is the full path on .NET (PS 7) but only the name on
+                                    # .NET Framework (PS 5.1), so use FullName to show the same thing on both.
+                                    if ($Item -is [System.IO.FileSystemInfo]) { $Item.FullName } else { "$Item" }
+                                </ScriptBlock>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+    </ViewDefinitions>
+</Configuration>
