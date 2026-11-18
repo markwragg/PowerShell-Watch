@@ -27,6 +27,12 @@ Task 'Test' -Depends 'ImportStagingModule' {
         throw "Failed '$($TestResults.FailedCount)' tests, build failed"
     }
 
+    # Also fail if a test file or block failed outside a test (e.g. during Discovery). Those tests never run,
+    # so FailedCount misses them and the only symptom would otherwise be a collapsed coverage figure.
+    if ($TestResults.FailedContainersCount -gt 0 -or $TestResults.FailedBlocksCount -gt 0) {
+        throw "Failed '$($TestResults.FailedContainersCount)' test files and '$($TestResults.FailedBlocksCount)' blocks, build failed"
+    }
+
     # Surface the coverage result as a pipeline output variable so a later stage (which runs in a
     # separate, discarded workspace) can apply it to README.md without re-running the tests.
     if ($env:GITHUB_OUTPUT) {

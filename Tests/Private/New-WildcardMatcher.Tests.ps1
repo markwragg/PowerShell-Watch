@@ -1,5 +1,8 @@
 $PSVersion = $PSVersionTable.PSVersion.Major
 
+# Remove any copy already loaded (e.g. the staged build) first: Windows PowerShell 5.1 can't re-import
+# Watch.types.ps1xml over an existing one ("The member ToString is already present"), which fails Discovery.
+Get-Module Watch | Remove-Module -Force
 Import-Module "$PSScriptRoot/../../Watch" -Force
 
 Describe "New-WildcardMatcher PS$PSVersion" {
