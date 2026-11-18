@@ -39,7 +39,7 @@ Describe "Skip-ExcludedItem PS$PSVersion" {
             Set-Content -Path (Join-Path $Folder 'data.txt') -Value 'a'
             $Files = Get-ChildItem -Path $Folder
 
-            $ByPath = [WildcardPattern]::new("$Folder\*.log", 'IgnoreCase')
+            $ByPath = [WildcardPattern]::new((Join-Path $Folder '*.log'), 'IgnoreCase')
             $Result = @(Skip-ExcludedItem -InputObject $Files -Matcher $ByPath)
             $Result.Name | Should -Be 'data.txt'
 
