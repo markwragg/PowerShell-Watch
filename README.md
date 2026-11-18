@@ -36,7 +36,7 @@ Cmdlet          | Description
 `wc`            | Alias for `Watch-Command`
 
 > [!NOTE]
-> On Linux and macOS, PowerShell aliases take precedence over native commands, so while this module is imported `watch` and `wc` will run `Watch-Command` rather than the native `watch` and `wc` (word count) utilities. Use the full path (e.g. `/usr/bin/wc`) to run the native commands, or unload the module (`Remove-Module Watch`).
+> On Linux and macOS, PowerShell aliases take precedence over native commands, so while this module is imported `watch` and `wc` will run `Watch-Command` rather than the native `watch` and `wc` (which are not necessarily present).
 
 ## Parameters
 
@@ -50,7 +50,7 @@ Cmdlet          | Description
 - `-Continuous` — Keep running after a change has occurred, until interrupted with CTRL+C.
 - `-AsString` — Convert the result into an array of strings before comparing.
 - `-ClearScreen` — Clear the screen before each change is output. Alias: `-cls`.
-- `-PassThru` — Return the initial result immediately, before any change has occurred.
+- `-PassThru` — Return the initial result immediately as a baseline before monitoring continues. This does not disable change detection or prevent later change output.
 - `-Property` — One or more property names to compare. Use `*` for all properties.
 
 Some parameters can't be combined. These rules are enforced by parameter sets, so `Get-Help Watch-Command` shows each valid combination:
@@ -88,7 +88,7 @@ Get-Service | wc
 - `-Difference` returns only the objects in a collection that have been added or changed (it does not report removed items, see [Change summaries](#change-summaries) for that).
 - `-Verbose` writes a timestamp before each change is output, which is particularly useful alongside `-Continuous` and `-Difference`.
 - `-ClearScreen` (alias `-cls`) clears the console before each change is output.
-- `-PassThru` returns the initial result immediately, before any change has occurred.
+- `-PassThru` returns the initial result immediately as a baseline before monitoring continues. It does not disable change detection or prevent later change output.
 
 For example:
 
@@ -98,12 +98,18 @@ Get-Service | Watch-Command -Difference -Continuous -Verbose
 
 This command continually outputs services each time one of their default properties changes, with a verbose timestamp above each change showing when it occurred:
 
+You can also include `-PassThru` to show the initial service list before subsequent changes:
+
+```powershell
+Get-Service | Watch-Command -Difference -Continuous -PassThru
+```
+
 > [!TIP]
 > PowerShell lets you shorten parameter names as long as they remain unambiguous, so `-Diff -Cont` works as well as `-Difference -Continuous`.
 
 #### Keeping the output after CTRL+C
 
-`-Continuous` only stops when you press CTRL+C, which also stops the assignment in `$Changes = ... | Watch-Command -Continuous`, so the variable is left empty. To keep everything that was output, use the common parameter `-OutVariable` (alias `-ov`) instead. It collects each object as it's output, so it still has every change after you press CTRL+C, while the output still appears in the console as usual:
+`-Continuous` only stops when you press CTRL+C, which also stops the assignment in `$Changes = ... | Watch-Command -Continuous`, so the variable is left empty. To keep everything that was output, use `-OutVariable`:
 
 ```powershell
 Get-ChildItem C:\Temp | Watch-Command -ChangeSummary -Key Name -Continuous -OutVariable Changes
@@ -128,9 +134,9 @@ Changes           | For `Modified` changes, one entry per changed property, with
 PreviousItem      | The whole item as it was before the change (`$null` for `Added`).
 CurrentItem       | The whole item as it is after the change (`$null` for `Removed`).
 
-Use `-Key` to name one or more properties that uniquely identify an item (e.g. `Name` or `Id`). Items are then paired up by key between checks, so an in-place change is reported as `Modified` (with the specific properties that changed) rather than as an unrelated removal and addition. Without `-Key`, changes are only reported as `Added` or `Removed`. `-Key` turns on `-ChangeSummary` by itself, so `-Key Name` on its own does the same as `-ChangeSummary -Key Name`.
+Use `-Key` to name one or more properties that uniquely identify an item (e.g. `Name` or `Id`). Items are then paired up by key between checks, so an in-place change is reported as `Modified` (with the changed properties) rather than an unrelated removal and addition.
 
-Key values are compared case-sensitively, so items whose keys differ only by case are treated as different items. (Detecting whether anything has changed at all ignores case, though, so renaming a file by only changing its case isn't reported by itself.) The key should be unique to each item. If several items share a key value (for example `Get-Process` with `-Key Name`, where many processes are called `svchost`), changes to them can't be paired up, so they're reported as `Removed` and `Added` rather than `Modified`, and a warning is shown. Use a unique property, such as `-Key Id`, or several properties together (`-Key Name, Id`) to avoid this.
+Key values are compared case-sensitively, so items whose keys differ only by case are treated as different items. (Detecting whether anything has changed at all ignores case, though, so renaming an item from `A` to `a` is not detected.)
 
 For example:
 
@@ -162,7 +168,6 @@ $Change = Get-ChildItem C:\Temp | Watch-Command -Key Name
 $Change.Changes
 
 Property      PreviousValue        CurrentValue
---------      -------------        ------------
 Length        5                    10
 LastWriteTime 17/11/2026 17:48:26  17/11/2026 17:52:03
 ```
@@ -173,7 +178,7 @@ LastWriteTime 17/11/2026 17:48:26  17/11/2026 17:52:03
 
 1. If you specify `-Property`, only those properties are compared.
 2. Otherwise, if the object has a default display property set (the properties shown by default in the console), those properties are compared.
-3. Otherwise, all of the object's regular properties are compared. Computed members, such as script properties, are excluded because they are evaluated live and can throw errors (for example on a file that has since been deleted). `LastAccessTime` and `LastAccessTimeUtc` are also excluded. Simply reading a file updates them, and Windows only updates the copy that `Get-ChildItem` sees at some later point, so they would report changes at seemingly random times. Name them with `-Property` if you do want to watch them.
+3. Otherwise, all of the object's regular properties are compared. Computed members, such as script properties, are excluded because they are evaluated live and can throw errors (for example on a deleted file).
 
 You can force the use of all properties by specifying `-Property *`.
 
@@ -187,7 +192,7 @@ This command continually outputs processes each time the set of process IDs chan
 
 ### Native commands
 
-You can also use `Watch-Command` to monitor non-PowerShell command output, which is generally treated as strings. Here's an example of monitoring the output of `ipconfig /all` for a change to the DNS server addresses:
+You can also use `Watch-Command` to monitor non-PowerShell command output, which is generally treated as strings. Here's an example of monitoring the output of `ipconfig /all` for a change to the network configuration:
 
 ```powershell
 ipconfig /all | Watch-Command -Verbose -Difference -Continuous -Seconds 5
