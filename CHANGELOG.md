@@ -1,5 +1,9 @@
 # Change Log
 
+## !Deploy 1.3.0
+
+* [Feature] The default table view for `-ChangeSummary` output now shows what changed as it happens: a new `Details` column lists each changed property with its previous and current values (e.g. `Length: 5 -> 10`) for `Modified` changes, and the item for `Added` and `Removed` changes. This replaces the `ChangedProperties` and `Item` columns. Long rows now wrap rather than being cut off at the console width.
+
 ## [1.2.0] - 2026-11-17
 
 * [Feature] Added a `-ChangeSummary` switch to `Watch-Command` that reports each change as a clean object (`DetectedAt` timestamp, `ChangeType` of `Added`, `Removed` or `Modified`, plus the whole item before and after the change as `PreviousItem`/`CurrentItem`) instead of raw `Compare-Object` output, and fixes removed items never being reported (previously only additions/modifications surfaced under `-Difference`). Use the new `-Key` parameter (e.g. `-Key Name`, which implies `-ChangeSummary`) to pair up the same logical item across checks and detect in-place modifications, including which properties changed (`ChangedProperties`) and their before and after values (`Changes`, with `PreviousValue`/`CurrentValue` for each property). Change summaries display as a fixed-width table by default, so with `-Continuous` each change appears as soon as it is detected (rather than being held back by `Format-Table` until the next change arrives).

@@ -140,7 +140,16 @@ Get-ChildItem C:\Temp | Watch-Command -ChangeSummary -Key Name -Continuous
 
 This monitors a folder and reports each file that is added, removed or modified, including which properties changed and their previous and current values.
 
-By default, change summaries are shown as a table with `Time` (the time part of `DetectedAt`), `ChangeType`, `Key`, `ChangedProperties` and `Item` columns, and each row appears as soon as the change is detected. Use `Format-List` to see every property, including the before and after values in `Changes`:
+By default, change summaries are shown as a table with `Time` (the time part of `DetectedAt`), `ChangeType`, `Key` and `Details` columns, and each row appears as soon as the change is detected. For a `Modified` change, `Details` shows each property that changed with its previous and current values, so you can see what changed as it happens. For an `Added` or `Removed` change, it shows the item:
+
+```plaintext
+Time     ChangeType Key                       Details
+----     ---------- ---                       -------
+17:52:03 Modified   test.txt                  Length: 5 -> 10; LastWriteTime: 11/17/2026 17:48:26 -> 11/17/2026 17:52:03
+17:52:09 Added      new.txt                   C:\Temp\new.txt
+```
+
+Use `Format-List` to see every property:
 
 ```powershell
 Get-ChildItem C:\Temp | Watch-Command -ChangeSummary -Key Name -Continuous | Format-List

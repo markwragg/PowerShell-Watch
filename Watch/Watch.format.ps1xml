@@ -30,15 +30,12 @@
                         <Width>25</Width>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>ChangedProperties</Label>
-                        <Width>25</Width>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>Item</Label>
+                        <Label>Details</Label>
                     </TableColumnHeader>
                 </TableHeaders>
                 <TableRowEntries>
                     <TableRowEntry>
+                        <Wrap/>
                         <TableColumnItems>
                             <TableColumnItem>
                                 <ScriptBlock>$_.DetectedAt.ToString('HH:mm:ss')</ScriptBlock>
@@ -58,14 +55,17 @@
                                 </ScriptBlock>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <ScriptBlock>$_.ChangedProperties -join ', '</ScriptBlock>
-                            </TableColumnItem>
-                            <TableColumnItem>
                                 <ScriptBlock>
-                                    $Item = if ($null -ne $_.CurrentItem) { $_.CurrentItem } else { $_.PreviousItem }
-                                    # FileSystemInfo.ToString() is the full path on .NET (PS 7) but only the name on
-                                    # .NET Framework (PS 5.1), so use FullName to show the same thing on both.
-                                    if ($Item -is [System.IO.FileSystemInfo]) { $Item.FullName } else { "$Item" }
+                                    if ($_.Changes) {
+                                        # Each Watch.PropertyChange reads as 'Property: Previous -> Current' (see Watch.types.ps1xml).
+                                        ($_.Changes | ForEach-Object { $_.ToString() }) -join '; '
+                                    }
+                                    else {
+                                        $Item = if ($null -ne $_.CurrentItem) { $_.CurrentItem } else { $_.PreviousItem }
+                                        # FileSystemInfo.ToString() is the full path on .NET (PS 7) but only the name on
+                                        # .NET Framework (PS 5.1), so use FullName to show the same thing on both.
+                                        if ($Item -is [System.IO.FileSystemInfo]) { $Item.FullName } else { "$Item" }
+                                    }
                                 </ScriptBlock>
                             </TableColumnItem>
                         </TableColumnItems>

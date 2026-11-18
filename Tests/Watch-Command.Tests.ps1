@@ -453,13 +453,13 @@ Describe "Watch-Command PS$PSVersion" {
                 $View = Get-FormatData -TypeName 'Watch.ChangeSummary'
                 $View | Should -Not -BeNullOrEmpty
                 $Headers = $View.FormatViewDefinition[0].Control.Headers
-                $Headers.Label | Should -Be @('Time', 'ChangeType', 'Key', 'ChangedProperties', 'Item')
-                $Headers[0..3].Width | Should -Not -Contain 0
+                $Headers.Label | Should -Be @('Time', 'ChangeType', 'Key', 'Details')
+                $Headers[0..2].Width | Should -Not -Contain 0
             }
 
             It 'Should render the table view without error' {
                 $Rendered = $Result | Format-Table | Out-String
-                $Rendered | Should -Match '\d{2}:\d{2}:\d{2}\s+Modified\s+1\s+Status'
+                $Rendered | Should -Match '\d{2}:\d{2}:\d{2}\s+Modified\s+1\s+Status: Running -> Stopped'
             }
         }
 
