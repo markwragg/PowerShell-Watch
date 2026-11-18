@@ -1,6 +1,6 @@
 # Change Log
 
-## !Deploy 1.3.0
+## [1.3.0] - 2026-11-18
 
 * [Feature] Added `-Exclude` (wildcards) and `-ExcludePattern` (regular expressions) parameters to `Watch-Command`. Items whose text matches are left out of every result, so they're neither compared nor output. If they exclude every item the command returns, a warning explains that there is nothing to watch (rather than it silently waiting forever).
 * [Feature] Added an `-ExcludeProperty` parameter to `Watch-Command`, which leaves one or more properties (wildcards supported) out of the comparison so changes to them are ignored, e.g. `Get-Date | Watch-Command -Property * -ExcludeProperty Second, Millisecond, Microsecond, Nanosecond, Ticks, TimeOfDay`.

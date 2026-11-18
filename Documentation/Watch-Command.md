@@ -8,25 +8,22 @@ Runs a scriptblock or the preceding pipeline repeatedly until there is change.
 ### Default (Default)
 ```
 Watch-Command [-ScriptBlock] <Object> [[-Seconds] <Int32>] [-Continuous] [-AsString] [-ClearScreen] [-PassThru]
- [[-Property] <String[]>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
+ [[-Property] <String[]>] [-ExcludeProperty <String[]>] [-Exclude <String[]>] [-ExcludePattern <String[]>]
+ [-ProgressAction <ActionPreference>] [<CommonParameters>]
 ```
 
 ### Difference
 ```
 Watch-Command [-ScriptBlock] <Object> [[-Seconds] <Int32>] [-Difference] [-Continuous] [-AsString]
- [-ClearScreen] [-PassThru] [[-Property] <String[]>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
-```
-
-### ChangeSummaryKey
-```
-Watch-Command [-ScriptBlock] <Object> [[-Seconds] <Int32>] [-ChangeSummary] -Key <String[]> [-Continuous]
- [-ClearScreen] [-PassThru] [[-Property] <String[]>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
+ [-ClearScreen] [-PassThru] [[-Property] <String[]>] [-ExcludeProperty <String[]>] [-Exclude <String[]>]
+ [-ExcludePattern <String[]>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
 ```
 
 ### ChangeSummary
 ```
-Watch-Command [-ScriptBlock] <Object> [[-Seconds] <Int32>] [-ChangeSummary] [-Continuous] [-AsString]
- [-ClearScreen] [-PassThru] [[-Property] <String[]>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
+Watch-Command [-ScriptBlock] <Object> [[-Seconds] <Int32>] [-ChangeSummary] [-Key <String[]>] [-Continuous]
+ [-AsString] [-ClearScreen] [-PassThru] [[-Property] <String[]>] [-ExcludeProperty <String[]>]
+ [-Exclude <String[]>] [-ExcludePattern <String[]>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -85,9 +82,28 @@ Monitors a folder and reports each change as an 'Added', 'Removed' or 'Modified'
 including which properties changed and their previous/current values, continuously until
 interrupted by CTRL+C.
 
-Parameter sets enforce the valid combinations: -Difference and -ChangeSummary are mutually
-exclusive, -Key implies -ChangeSummary (so can't be combined with -Difference), and -Key can't be
-combined with -AsString.
+### EXAMPLE 7
+```
+ipconfig /all | Watch-Command -ChangeSummary -Continuous -Exclude '*Lease*'
+```
+
+Monitors the network configuration for changes, excluding the lease times, which ipconfig can show
+shifting back and forth by a second between runs.
+
+### EXAMPLE 8
+```
+ipconfig /all | Watch-Command -ChangeSummary -Continuous -ExcludePattern 'Lease (Obtained|Expires)'
+```
+
+As above, but uses a regular expression to exclude only the lease time lines.
+
+### EXAMPLE 9
+```
+Get-ChildItem C:\Temp | Watch-Command -ChangeSummary -Key Name -ExcludeProperty LastWriteTime*
+```
+
+Monitors a folder like the example above, but ignores changes that only affect when the files were
+last written to.
 
 ## PARAMETERS
 
@@ -160,22 +176,10 @@ ChangedProperties, and their previous and current values in Changes.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: ChangeSummaryKey
-Aliases:
-
-Required: False
-Position: Named
-Default value: False
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-```yaml
-Type: SwitchParameter
 Parameter Sets: ChangeSummary
 Aliases:
 
-Required: True
+Required: False
 Position: Named
 Default value: False
 Accept pipeline input: False
@@ -193,10 +197,10 @@ Cannot be used with -Difference or -AsString.
 
 ```yaml
 Type: String[]
-Parameter Sets: ChangeSummaryKey
+Parameter Sets: ChangeSummary
 Aliases:
 
-Required: True
+Required: False
 Position: Named
 Default value: None
 Accept pipeline input: False
@@ -223,7 +227,7 @@ Switch: Converts the result of the scriptblock into an array of strings for comp
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Default, Difference, ChangeSummary
+Parameter Sets: (All)
 Aliases:
 
 Required: False
@@ -279,6 +283,74 @@ Aliases:
 
 Required: False
 Position: 3
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ExcludeProperty
+One or more property names to leave out of the comparison, so changes to them are ignored.
+Wildcards are supported (case-insensitive, e.g.
+'Last*Time').
+They are removed from whichever
+properties would otherwise be compared (see -Property), so they can be combined with -Property *.
+The properties are still output, as only the comparison changes.
+Cannot be used with -AsString.
+
+```yaml
+Type: String[]
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Exclude
+One or more wildcard patterns (case-insensitive, e.g.
+'*Lease*').
+Items whose text matches any of
+them are dropped from every result before comparing, so they are neither watched nor output.
+Each
+pattern must match the whole text, so use * either side to match part of it.
+For text output
+(e.g.
+from a native command, or with -AsString) this excludes matching lines.
+For objects it
+matches each object's string form; for files and folders that is their full path.
+This drops
+whole items: to ignore some of an object's properties, use -ExcludeProperty.
+Cannot be combined
+with -ExcludePattern.
+
+```yaml
+Type: String[]
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ExcludePattern
+One or more regular expressions (case-insensitive).
+Works like -Exclude, but matches with regular
+expressions instead of wildcards, which match anywhere in the text unless anchored with ^ or $.
+Cannot be combined with -Exclude.
+
+```yaml
+Type: String[]
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
