@@ -52,12 +52,16 @@ Cmdlet          | Description
 - `-ClearScreen` — Clear the screen before each change is output. Alias: `-cls`.
 - `-PassThru` — Return the initial result immediately as a baseline before monitoring continues. This does not disable change detection or prevent later change output.
 - `-Property` — One or more property names to compare. Use `*` for all properties.
+- `-ExcludeProperty` — One or more property names (wildcards supported, case-insensitive) to leave out of the comparison, so changes to them are ignored. They're still output.
+- `-Exclude` — One or more wildcard patterns (case-insensitive, e.g. `*Lease*`). Items whose text matches are excluded: they're not compared and not output. For text output this excludes matching lines; for objects it matches their string form (the full path for files and folders). Each pattern must match the whole text, so use `*` either side to match part of it. This drops whole items, not properties: use `-ExcludeProperty` for those.
+- `-ExcludePattern` — Like `-Exclude`, but takes one or more regular expressions (case-insensitive), which match anywhere in the text unless anchored with `^` or `$`.
 
-Some parameters can't be combined. These rules are enforced by parameter sets, so `Get-Help Watch-Command` shows each valid combination:
+Some parameters can't be combined:
 
 - `-ChangeSummary` and `-Difference` are mutually exclusive.
 - `-Key` implies `-ChangeSummary`, so it can't be used with `-Difference` either.
-- `-Key` can't be used with `-AsString`.
+- `-Key` and `-ExcludeProperty` can't be used with `-AsString`.
+- `-Exclude` and `-ExcludePattern` are mutually exclusive.
 
 See [Documentation/Watch-Command.md](Documentation/Watch-Command.md) or run `Get-Help Watch-Command -Full` for the full reference.
 
@@ -80,7 +84,7 @@ Get-Service | wc
 ```
 
 > [!NOTE]
-> The shorthand works by re-reading the source of the command, and re-runs only the commands that are piped into `Watch-Command`. Anything else on the line, such as an assignment (`$Result = ...`) or an earlier statement separated by `;`, is not re-run. In a script, a pipeline can span several lines. When typed interactively, a multi-line pipeline is only supported on PowerShell 7.4 and later. If the shorthand can't work out the piped commands, it says so, and you can use `-ScriptBlock { ... }` instead.
+> The shorthand works by re-reading the source of the command, and re-runs only the commands that are piped into `Watch-Command`. Anything else on the line, such as an assignment (`$Result = ...`) or an earlier statement separated by `;`, is not re-run. A pipeline can span several lines, both in a script and when typed interactively. If the shorthand can't work out the piped commands, it says so, and you can use `-ScriptBlock { ... }` instead.
 
 ### Continuous and difference mode
 
@@ -190,6 +194,17 @@ Get-Process | Watch-Command -Difference -Continuous -Property Id
 
 This command continually outputs processes each time the set of process IDs changes (e.g. a new process has started).
 
+To ignore changes to some properties instead, use `-ExcludeProperty`. It removes properties (wildcards are supported) from whichever ones would otherwise be compared, so it also works with `-Property *`. For example, to wait for the minute to change, ignoring the properties of the current time that change more often:
+
+```powershell
+Get-Date | Watch-Command -Property * -ExcludeProperty Second, Millisecond, Microsecond, Nanosecond, Ticks, TimeOfDay
+```
+
+`-ExcludeProperty` only affects which properties are compared: the objects that are output still have all of their properties.
+
+> [!NOTE]
+> `-Exclude` and `-ExcludePattern` do something different: they drop whole items whose text matches, which is useful for lines of text (see [Native commands](#native-commands)). For an object, the text is its string form, such as `11/18/2026 12:30:00` for `Get-Date`, not its property names. If they exclude every item a command returns, there's nothing to compare, so `Watch-Command` warns you.
+
 ### Native commands
 
 You can also use `Watch-Command` to monitor non-PowerShell command output, which is generally treated as strings. Here's an example of monitoring the output of `ipconfig /all` for a change to the network configuration:
@@ -199,5 +214,17 @@ ipconfig /all | Watch-Command -Verbose -Difference -Continuous -Seconds 5
 ```
 
 ![Watch-Command ipconfig Example](/Media/watch-command-ipconfig.png)
+
+Some lines can change without anything meaningful changing. For example, `ipconfig` can show the lease times shifting back and forth by a second between runs. Use `-Exclude` to leave out the lines that match one or more wildcard patterns:
+
+```powershell
+ipconfig /all | Watch-Command -ChangeSummary -Continuous -Exclude '*Lease*'
+```
+
+Or use `-ExcludePattern` to match with regular expressions instead:
+
+```powershell
+ipconfig /all | Watch-Command -ChangeSummary -Continuous -ExcludePattern 'Lease (Obtained|Expires)'
+```
 
 To force `Watch-Command` to treat the result of any command as an array of strings, regardless of the object type returned, use the `-AsString` parameter.

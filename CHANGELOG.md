@@ -2,7 +2,11 @@
 
 ## !Deploy 1.3.0
 
+* [Feature] Added `-Exclude` (wildcards) and `-ExcludePattern` (regular expressions) parameters to `Watch-Command`. Items whose text matches are left out of every result, so they're neither compared nor output. If they exclude every item the command returns, a warning explains that there is nothing to watch (rather than it silently waiting forever).
+* [Feature] Added an `-ExcludeProperty` parameter to `Watch-Command`, which leaves one or more properties (wildcards supported) out of the comparison so changes to them are ignored, e.g. `Get-Date | Watch-Command -Property * -ExcludeProperty Second, Millisecond, Microsecond, Nanosecond, Ticks, TimeOfDay`.
 * [Feature] The default table view for `-ChangeSummary` output now shows what changed as it happens: a new `Details` column lists each changed property with its previous and current values (e.g. `Length: 5 -> 10`) for `Modified` changes, and the item for `Added` and `Removed` changes. This replaces the `ChangedProperties` and `Item` columns. Long rows now wrap rather than being cut off at the console width.
+* [Fix] `-ChangeSummary` (without `-Key`) failed with a 'Parameter set cannot be resolved' error when the command was piped into `Watch-Command` (e.g. `Get-ChildItem | Watch-Command -ChangeSummary`). It only worked with `-ScriptBlock { ... }`.
+* [Fix] The pipeline shorthand now works when a pipeline split across several lines is typed interactively (or run outside a script file), e.g. `Get-Date |` on one line and `Watch-Command` on the next. Previously this always failed with 'Could not determine the commands piped into Watch-Command', including on PowerShell 7.4 and later, where it was documented as working.
 
 ## [1.2.0] - 2026-11-17
 

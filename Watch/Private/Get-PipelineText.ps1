@@ -8,15 +8,20 @@ function Get-PipelineText {
             Parses the source of the invocation and takes only the pipeline elements that precede the command,
             so anything else on the line (an assignment such as '$r = ', earlier ';'-separated statements, or
             commands after it in the pipeline) is excluded. When invoked from a script file, the whole file is
-            parsed so a pipeline split across several lines is recovered in full. Works on Windows PowerShell
-            5.1 and PowerShell 7.
+            parsed so a pipeline split across several lines is recovered in full. Otherwise, a multi-line
+            pipeline is recovered from -CallerExtent: the Position of the caller's call stack frame
+            ((Get-PSCallStack)[1].Position from within the invoked command), whose script position gives the
+            full source that was run.
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param(
         [Parameter(Mandatory)]
         [System.Management.Automation.InvocationInfo]
-        $Invocation
+        $Invocation,
+
+        [System.Management.Automation.Language.IScriptExtent]
+        $CallerExtent
     )
 
     $Parser = [System.Management.Automation.Language.Parser]
@@ -49,27 +54,14 @@ function Get-PipelineText {
         }
     }
 
-    # PowerShell 7.4+ exposes the full text of the statement, which covers multi-line pipelines typed
-    # interactively. Its position relative to the line isn't known, so only use it if exactly one pipeline
-    # in it ends in a command of this name.
-    $Statement = if ($Invocation.PSObject.Properties['Statement']) { $Invocation.Statement }
+    # A pipeline split over several lines that wasn't run from a script file (e.g. typed interactively):
+    # .Line holds only the last line, so parse the full source the caller ran instead. The invocation's line
+    # and column are relative to that source, so they locate the command exactly.
+    # (InvocationInfo.Statement in PowerShell 7.4+ can't be used for this: it holds only the command itself.)
+    $FullScript = if ($CallerExtent) { $CallerExtent.StartScriptPosition.GetFullScript() }
 
-    if ($Statement) {
-        $StatementAst = $Parser::ParseInput($Statement, [ref]$null, [ref]$null)
-        $Matched = @($StatementAst.FindAll({
-                    param($Node)
-                    $Node -is [System.Management.Automation.Language.CommandAst] -and
-                    $Node.GetCommandName() -eq $Invocation.InvocationName -and
-                    $Node.Parent -is [System.Management.Automation.Language.PipelineAst] -and
-                    $Node.Parent.PipelineElements.IndexOf($Node) -gt 0
-                }, $true))
-
-        if ($Matched.Count -eq 1) {
-            $Text = Get-UpstreamPipelineText -Ast $StatementAst -LineNumber $Matched[0].Extent.StartLineNumber -ColumnNumber $Matched[0].Extent.StartColumnNumber
-
-            if ($Text) {
-                return $Text
-            }
-        }
+    if ($FullScript) {
+        $FullAst = $Parser::ParseInput($FullScript, [ref]$null, [ref]$null)
+        Get-UpstreamPipelineText -Ast $FullAst -LineNumber $Invocation.ScriptLineNumber -ColumnNumber $Invocation.OffsetInLine
     }
 }

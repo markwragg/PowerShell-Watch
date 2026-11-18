@@ -1,13 +1,6 @@
-if (-not $PSScriptRoot) { $PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent }
-
 $PSVersion = $PSVersionTable.PSVersion.Major
-$Root = "$PSScriptRoot/../"
-$Module = 'Watch'
 
-Get-Module $Module | Remove-Module -Force
-Start-Sleep 5
-
-Import-Module $Root/$Module
+Import-Module "$PSScriptRoot/../../Watch" -Force
 
 Describe "Watch-Command PS$PSVersion" {
 
@@ -107,34 +100,6 @@ Describe "Watch-Command PS$PSVersion" {
             }
         }
 
-        Context 'Get-UpstreamPipelineText' {
-
-            BeforeAll {
-                function Get-TestUpstream ($Source, $Line, $Column) {
-                    $Ast = [System.Management.Automation.Language.Parser]::ParseInput($Source, [ref]$null, [ref]$null)
-                    Get-UpstreamPipelineText -Ast $Ast -LineNumber $Line -ColumnNumber $Column
-                }
-            }
-
-            It 'Should return only the elements before the command, excluding assignments and later elements' {
-                Get-TestUpstream '$r = Get-ChildItem C:\Temp | Sort-Object Name | Watch-Command -Seconds 2 | Format-Table' 1 49 |
-                    Should -Be 'Get-ChildItem C:\Temp | Sort-Object Name'
-            }
-
-            It 'Should find the command on a later line of a multi-line pipeline' {
-                Get-TestUpstream "Get-Process |`n    Where-Object CPU |`n    Watch-Command" 3 5 |
-                    Should -Be 'Get-Process | Where-Object CPU'
-            }
-
-            It 'Should return nothing when the command is first in its pipeline' {
-                Get-TestUpstream 'Watch-Command { Get-Date }' 1 1 | Should -BeNullOrEmpty
-            }
-
-            It 'Should return nothing when no command starts at the given position' {
-                Get-TestUpstream 'Get-Date | Watch-Command' 1 5 | Should -BeNullOrEmpty
-            }
-        }
-
         Context 'Expected exceptions' {
             It 'Should throw if a ScriptBlock is not provided unless via Pipeline' {
                 { Watch-Command -ScriptBlock Get-Date } | Should -Throw 'The -ScriptBlock parameter must be provided an object of type ScriptBlock unless invoked via the Pipeline.'
@@ -150,9 +115,28 @@ Describe "Watch-Command PS$PSVersion" {
                     Should -Throw -ErrorId 'AmbiguousParameterSet,Watch-Command'
             }
 
-            It 'Should reject -Key combined with -AsString (parameter sets)' {
+            It 'Should reject -Key combined with -AsString' {
                 { Watch-Command -ScriptBlock { [pscustomobject]@{ Id = 1 } } -ChangeSummary -Key Id -AsString } |
-                    Should -Throw -ErrorId 'AmbiguousParameterSet,Watch-Command'
+                    Should -Throw '-Key cannot be used with -AsString*'
+            }
+
+            It 'Should accept -ChangeSummary (with or without -Key) when the command is piped in' {
+                # Regression: separate -ChangeSummary/-Key parameter sets made the pipeline shorthand fail with
+                # AmbiguousParameterSet, as the set is chosen before the piped input is bound.
+                function Get-TestCounter {
+                    $global:WatchTestCounter++
+                    [pscustomobject]@{ Id = 1; Count = $global:WatchTestCounter }
+                }
+
+                $global:WatchTestCounter = 0
+                $Unkeyed = Get-TestCounter | Watch-Command -ChangeSummary -Seconds 0
+                @($Unkeyed).ChangeType | Should -Be @('Added', 'Removed')
+
+                $global:WatchTestCounter = 0
+                $Keyed = Get-TestCounter | Watch-Command -Key Id -Seconds 0
+                $Keyed.ChangeType | Should -Be 'Modified'
+
+                Remove-Variable -Name WatchTestCounter -Scope Global
             }
 
             It 'Should keep -Property as the third positional parameter, as in previous releases' {
@@ -460,6 +444,352 @@ Describe "Watch-Command PS$PSVersion" {
             It 'Should render the table view without error' {
                 $Rendered = $Result | Format-Table | Out-String
                 $Rendered | Should -Match '\d{2}:\d{2}:\d{2}\s+Modified\s+1\s+Status: Running -> Stopped'
+            }
+        }
+
+        Context 'Invoked with -Exclude or -ExcludePattern' {
+
+            BeforeAll {
+                Mock Start-Sleep {}
+            }
+
+            It 'Should not report a change in lines that match -ExcludePattern' {
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    'IPv4 Address : 10.0.0.1'
+                    # Flickers on every check, as ipconfig's lease times can.
+                    "Lease Expires : $script:CallCount"
+                    if ($script:CallCount -ge 4) { 'Default Gateway : 10.0.0.254' }
+                }
+
+                $Result = @(Watch-Command -ScriptBlock $Sb -ChangeSummary -ExcludePattern 'Lease (Obtained|Expires)')
+
+                $script:CallCount | Should -Be 4
+                $Result.Count | Should -Be 1
+                $Result[0].ChangeType | Should -Be 'Added'
+                $Result[0].CurrentItem | Should -Be 'Default Gateway : 10.0.0.254'
+            }
+
+            It 'Should combine several patterns and match case-insensitively' {
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    "first $script:CallCount"
+                    "SECOND $script:CallCount"
+                    if ($script:CallCount -ge 3) { 'third' }
+                }
+
+                # The first result is entirely excluded, which warns.
+                $Result = @(Watch-Command -ScriptBlock $Sb -ChangeSummary -ExcludePattern '^first', '^second' -WarningAction SilentlyContinue)
+
+                $script:CallCount | Should -Be 3
+                $Result.CurrentItem | Should -Be 'third'
+            }
+
+            It 'Should leave ignored items out of the output and -PassThru' {
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    'keep'
+                    "noise $script:CallCount"
+                    if ($script:CallCount -ge 3) { 'new' }
+                }
+
+                $Result = @(Watch-Command -ScriptBlock $Sb -PassThru -ExcludePattern 'noise')
+
+                $Result | Should -Be @('keep', 'keep', 'new')
+            }
+
+            It 'Should match objects by their string form' {
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    [pscustomobject]@{ Name = 'app.log'; Length = $script:CallCount }
+                    [pscustomobject]@{ Name = 'data.txt'; Length = [int]($script:CallCount -ge 3) }
+                }
+
+                $Result = @(Watch-Command -ScriptBlock $Sb -Key Name -ExcludePattern '\.log\b')
+
+                $script:CallCount | Should -Be 3
+                $Result.Count | Should -Be 1
+                $Result[0].Key | Should -Be 'data.txt'
+            }
+
+            It 'Should throw straight away for an invalid regular expression' {
+                $script:CallCount = 0
+                { Watch-Command -ScriptBlock { $script:CallCount++; 'x' } -ExcludePattern '(' } |
+                    Should -Throw '-ExcludePattern contains an invalid regular expression*'
+                $script:CallCount | Should -Be 0
+            }
+
+            It 'Should not report a change in lines that match -Exclude wildcards, case-insensitively' {
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    'IPv4 Address : 10.0.0.1'
+                    "Lease Obtained : $script:CallCount"
+                    "Lease Expires : $script:CallCount"
+                    if ($script:CallCount -ge 4) { 'Default Gateway : 10.0.0.254' }
+                }
+
+                $Result = @(Watch-Command -ScriptBlock $Sb -ChangeSummary -Exclude '*lease*')
+
+                $script:CallCount | Should -Be 4
+                $Result.Count | Should -Be 1
+                $Result[0].CurrentItem | Should -Be 'Default Gateway : 10.0.0.254'
+            }
+
+            It 'Should require an -Exclude wildcard to match the whole text' {
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    "Lease Expires : $script:CallCount"
+                    if ($script:CallCount -ge 3) { 'new' }
+                }
+
+                # 'Lease' alone doesn't match 'Lease Expires : n', so the first change is still reported.
+                $Result = @(Watch-Command -ScriptBlock $Sb -ChangeSummary -Exclude 'Lease')
+
+                $script:CallCount | Should -Be 2
+                $Result.ChangeType | Should -Be @('Added', 'Removed')
+            }
+
+            It 'Should match files by their full path with -Exclude' {
+                $script:Folder = Join-Path $TestDrive 'exclude'
+                $null = New-Item -Path $script:Folder -ItemType Directory -Force
+                Set-Content -Path (Join-Path $script:Folder 'app.log') -Value 'a'
+                Set-Content -Path (Join-Path $script:Folder 'data.txt') -Value 'a'
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    if ($script:CallCount -eq 2) {
+                        Add-Content -Path (Join-Path $script:Folder 'app.log') -Value 'more'
+                    }
+                    if ($script:CallCount -eq 3) {
+                        Add-Content -Path (Join-Path $script:Folder 'data.txt') -Value 'more'
+                    }
+                    Get-ChildItem -Path $script:Folder
+                }
+
+                $Result = @(Watch-Command -ScriptBlock $Sb -Key Name -Property Name, Length -Exclude "$script:Folder\*.log")
+
+                $Result.Count | Should -Be 1
+                $Result[0].Key | Should -Be 'data.txt'
+            }
+
+            It 'Should throw straight away for an invalid -Exclude wildcard' {
+                $script:CallCount = 0
+                { Watch-Command -ScriptBlock { $script:CallCount++; 'x' } -Exclude '[abc' } |
+                    Should -Throw "-Exclude contains an invalid wildcard pattern '``[abc'*"
+                $script:CallCount | Should -Be 0
+            }
+
+            It 'Should reject -Exclude and -ExcludePattern together' {
+                { Watch-Command -ScriptBlock { 'x' } -Exclude '*a*' -ExcludePattern 'a' } |
+                    Should -Throw '-Exclude and -ExcludePattern cannot be used together*'
+            }
+
+            It 'Should warn once when every item is excluded, then keep watching' {
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    if ($script:CallCount -ge 4) { 'kept' } else { "excluded $script:CallCount" }
+                }
+
+                $Result = @(Watch-Command -ScriptBlock $Sb -ChangeSummary -ExcludePattern '^excluded' -WarningVariable Warnings -WarningAction SilentlyContinue)
+
+                @($Warnings).Count | Should -Be 1
+                "$($Warnings[0])" | Should -BeLike "-ExcludePattern excluded every item*e.g. 'excluded 1'*-ExcludeProperty*"
+                $Result.Count | Should -Be 1
+                $Result[0].CurrentItem | Should -Be 'kept'
+            }
+
+            It 'Should name -Exclude in the warning when that was used' {
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    if ($script:CallCount -ge 2) { 'kept' } else { 'excluded' }
+                }
+
+                $null = Watch-Command -ScriptBlock $Sb -Exclude 'excluded' -WarningVariable Warnings -WarningAction SilentlyContinue
+
+                "$($Warnings[0])" | Should -BeLike '-Exclude excluded every item*'
+            }
+
+            It "Should quote a file's full path in the warning, as that is what is matched" {
+                $script:Folder = Join-Path $TestDrive 'warn-exclude'
+                $null = New-Item -Path $script:Folder -ItemType Directory -Force
+                Set-Content -Path (Join-Path $script:Folder 'app.log') -Value 'a'
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    if ($script:CallCount -ge 2) { 'kept' } else { Get-ChildItem -Path $script:Folder }
+                }
+
+                $null = Watch-Command -ScriptBlock $Sb -Exclude '*.log' -WarningVariable Warnings -WarningAction SilentlyContinue
+
+                "$($Warnings[0])" | Should -BeLike "*e.g. '$(Join-Path $script:Folder 'app.log')'*"
+            }
+
+            It 'Should not warn when the command returns nothing at all' {
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    if ($script:CallCount -ge 2) { 'kept' }
+                }
+
+                $null = Watch-Command -ScriptBlock $Sb -ExcludePattern 'excluded' -WarningVariable Warnings -WarningAction SilentlyContinue
+
+                @($Warnings).Count | Should -Be 0
+            }
+        }
+
+        Context 'Invoked with -ExcludeProperty' {
+
+            BeforeAll {
+                Mock Start-Sleep {}
+
+                # Noise changes on every check; Value only changes on the 4th.
+                $script:NewItem = {
+                    [PSCustomObject]@{
+                        Name       = 'item'
+                        Value      = if ($script:CallCount -ge 4) { 'changed' } else { 'same' }
+                        NoiseA     = $script:CallCount
+                        NoiseB     = -$script:CallCount
+                    }
+                }
+            }
+
+            It 'Should ignore changes to excluded properties, matched by wildcard' {
+                $script:CallCount = 0
+                $Sb = { $script:CallCount++; & $script:NewItem }
+
+                $Result = @(Watch-Command -ScriptBlock $Sb -Key Name -ExcludeProperty 'noise*')
+
+                $script:CallCount | Should -Be 4
+                $Result.Count | Should -Be 1
+                $Result[0].ChangeType | Should -Be 'Modified'
+                $Result[0].Changes.Property | Should -Be 'Value'
+            }
+
+            It 'Should combine with -Property *' {
+                $script:CallCount = 0
+                $Sb = { $script:CallCount++; & $script:NewItem }
+
+                $Result = @(Watch-Command -ScriptBlock $Sb -Difference -Property * -ExcludeProperty NoiseA, NoiseB)
+
+                $script:CallCount | Should -Be 4
+                $Result.Value | Should -Be 'changed'
+            }
+
+            It 'Should still output the excluded properties' {
+                $script:CallCount = 0
+                $Sb = { $script:CallCount++; & $script:NewItem }
+
+                $Result = @(Watch-Command -ScriptBlock $Sb -ExcludeProperty 'Noise*')
+
+                $Result[0].NoiseA | Should -Be 4
+            }
+
+            It 'Should throw when every property is excluded' {
+                { Watch-Command -ScriptBlock { [PSCustomObject]@{ A = 1; B = 2 } } -ExcludeProperty * } |
+                    Should -Throw '-ExcludeProperty excludes every property*'
+            }
+
+            It 'Should throw when used with -AsString' {
+                { Watch-Command -ScriptBlock { 'x' } -AsString -ExcludeProperty Length } |
+                    Should -Throw '-ExcludeProperty cannot be used with -AsString*'
+            }
+
+            It 'Should throw straight away for an invalid wildcard' {
+                $script:CallCount = 0
+                { Watch-Command -ScriptBlock { $script:CallCount++; 'x' } -ExcludeProperty '[abc' } |
+                    Should -Throw "-ExcludeProperty contains an invalid wildcard pattern '``[abc'*"
+                $script:CallCount | Should -Be 0
+            }
+
+            It 'Should warn that it has no effect on text output' {
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    if ($script:CallCount -ge 2) { 'b' } else { 'a' }
+                }
+
+                $Result = @(Watch-Command -ScriptBlock $Sb -ExcludeProperty Length -WarningVariable Warnings -WarningAction SilentlyContinue)
+
+                $Result | Should -Be 'b'
+                @($Warnings).Count | Should -Be 1
+                "$($Warnings[0])" | Should -BeLike '-ExcludeProperty has no effect here*'
+            }
+        }
+
+        Context 'Invoked via a pipeline split over several lines, outside a script file' {
+
+            BeforeAll {
+                Mock Start-Sleep {}
+                # Call 1 is the pipeline itself, whose output is discarded; Watch-Command re-runs it from call 2.
+                # Throws rather than looping forever if the shorthand doesn't work.
+                function Get-TestCounter {
+                    $script:CallCount++
+                    if ($script:CallCount -gt 5) { throw 'Watch-Command did not stop' }
+                    if ($script:CallCount -ge 3) { 'changed' } else { 'first' }
+                }
+            }
+
+            It 'Should re-run the piped commands' {
+                $script:CallCount = 0
+
+                $Result = @(& ([scriptblock]::Create("Get-TestCounter |`n    Watch-Command -PassThru")))
+
+                $Result | Should -Be 'first', 'changed'
+                $script:CallCount | Should -Be 3
+            }
+        }
+
+        Context 'Invoked via pipeline when the piped commands cannot be determined' {
+
+            It 'Should throw rather than watch nothing' {
+                Mock Get-PipelineText {}
+
+                { 1 | Watch-Command } | Should -Throw 'Could not determine the commands piped into Watch-Command*'
+            }
+
+            # A host running the command directly has no caller frame on the call stack, and no source text.
+            It 'Should throw the same error when a host pipes input to it directly' {
+                $PowerShell = [powershell]::Create()
+
+                try {
+                    $null = $PowerShell.AddCommand('Import-Module').AddParameter('Name', (Get-Module Watch).Path).Invoke()
+                    $PowerShell.Commands.Clear()
+                    $null = $PowerShell.AddCommand('Watch-Command')
+
+                    { $PowerShell.Invoke(@(1)) } | Should -Throw '*Could not determine the commands piped into Watch-Command*'
+                }
+                finally {
+                    $PowerShell.Dispose()
+                }
+            }
+        }
+
+        Context 'Invoked with -ClearScreen and -PassThru' {
+
+            BeforeAll {
+                Mock Start-Sleep {}
+                Mock Clear-Host {}
+            }
+
+            It 'Should clear the screen before outputting the first result' {
+                $script:CallCount = 0
+                $Sb = {
+                    $script:CallCount++
+                    if ($script:CallCount -ge 2) { 'changed' } else { 'first' }
+                }
+
+                $Result = @(Watch-Command -ScriptBlock $Sb -PassThru -ClearScreen)
+
+                $Result | Should -Be 'first', 'changed'
+                Should -Invoke Clear-Host -Exactly -Times 2
             }
         }
 
