@@ -575,7 +575,7 @@ Describe "Watch-Command PS$PSVersion" {
                     Get-ChildItem -Path $script:Folder
                 }
 
-                $Result = @(Watch-Command -ScriptBlock $Sb -Key Name -Property Name, Length -Exclude "$script:Folder\*.log")
+                $Result = @(Watch-Command -ScriptBlock $Sb -Key Name -Property Name, Length -Exclude (Join-Path $script:Folder '*.log'))
 
                 $Result.Count | Should -Be 1
                 $Result[0].Key | Should -Be 'data.txt'
@@ -763,7 +763,9 @@ Describe "Watch-Command PS$PSVersion" {
                 $PowerShell = [powershell]::Create()
 
                 try {
-                    $null = $PowerShell.AddCommand('Import-Module').AddParameter('Name', (Get-Module Watch).Path).Invoke()
+                    # This runs inside the module (InModuleScope), so ask it for its own path: Get-Module Watch
+                    # can't see the module from here, as the test file imported it into Pester's scope.
+                    $null = $PowerShell.AddCommand('Import-Module').AddParameter('Name', $ExecutionContext.SessionState.Module.Path).Invoke()
                     $PowerShell.Commands.Clear()
                     $null = $PowerShell.AddCommand('Watch-Command')
 
